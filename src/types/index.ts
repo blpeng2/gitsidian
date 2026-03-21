@@ -18,30 +18,11 @@ export interface GitHubRepo {
   };
 }
 
-// Meta note for each repository
-export interface MetaNote {
-  repoId: number;
-  repoName: string;
-  purpose: string;          // Why this repo exists
-  keyIdeas: string;         // Core concepts
-  relatedRepos: string[];   // [[repo-name]] links
-  nextExperiments: string;  // What to try next
-  publicReady: boolean;     // Can be made public?
-  publicChecklist: {
-    readme: boolean;
-    license: boolean;
-    sensitiveData: boolean;
-    documentation: boolean;
-  };
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-// Wiki-link extracted from meta notes
+// Wiki-link extracted from READMEs
 export interface WikiLink {
-  source: string;  // Source repo name
-  target: string;  // Target repo name
+  source: string; // Source repo name
+  target: string; // Target repo name
+  alias?: string; // Display alias if [[repo|alias]] syntax used
 }
 
 // Graph node for visualization
@@ -53,9 +34,10 @@ export interface GraphNode {
     isPrivate: boolean;
     topics: string[];
     updatedAt: string;
-    hasMetaNote: boolean;
+    hasReadme: boolean;
     isOrphan: boolean;
-    publicReady: boolean;
+    language: string | null;
+    htmlUrl: string;
   };
 }
 
@@ -65,7 +47,7 @@ export interface GraphEdge {
     id: string;
     source: string;
     target: string;
-    type: 'wikilink' | 'topic' | 'manual';
+    type: 'wikilink' | 'topic';
   };
 }
 
@@ -88,10 +70,11 @@ export interface AppState {
   isAuthenticated: boolean;
   accessToken: string | null;
   repos: GitHubRepo[];
-  metaNotes: Record<string, MetaNote>;
+  readmeContents: Record<string, string>;
   selectedRepo: string | null;
   filterOptions: FilterOptions;
   isLoading: boolean;
+  isLoadingReadmes: boolean;
   error: string | null;
 }
 
@@ -99,8 +82,9 @@ export interface AppState {
 export type AppAction =
   | { type: 'SET_AUTHENTICATED'; payload: { isAuthenticated: boolean; accessToken: string | null } }
   | { type: 'SET_REPOS'; payload: GitHubRepo[] }
-  | { type: 'SET_META_NOTE'; payload: MetaNote }
+  | { type: 'SET_README_CONTENT'; payload: { repoName: string; content: string } }
   | { type: 'SET_SELECTED_REPO'; payload: string | null }
   | { type: 'SET_FILTER_OPTIONS'; payload: Partial<FilterOptions> }
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_LOADING_READMES'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null };

@@ -1,24 +1,25 @@
-import { WikiLink, GitHubRepo, MetaNote, GraphData, GraphNode, GraphEdge } from '../types';
+import { WikiLink, GitHubRepo, GraphData, GraphNode, GraphEdge } from '../types';
 
-// Wiki-link pattern: [[repo-name]]
-const WIKILINK_PATTERN = /\[\[([^\]]+)\]\]/g;
+// Wiki-link pattern: [[repo-name]] or [[repo-name|display text]]
+const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
 /**
  * Parse wiki-links from text
- * @param text - Text containing [[repo-name]] patterns
- * @param sourceRepo - Name of the source repository
- * @returns Array of WikiLink objects
  */
 export function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
   const links: WikiLink[] = [];
-  let match;
+  let match: RegExpExecArray | null;
+  // Reset regex lastIndex
+  const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
 
-  while ((match = WIKILINK_PATTERN.exec(text)) !== null) {
+  while ((match = regex.exec(text)) !== null) {
     const targetRepo = match[1].trim();
-    if (targetRepo && targetRepo !== sourceRepo) {
+    const alias = match[2]?.trim();
+    if (targetRepo && targetRepo.toLowerCase() !== sourceRepo.toLowerCase()) {
       links.push({
         source: sourceRepo,
         target: targetRepo,
+        ...(alias && { alias }),
       });
     }
   }
@@ -27,67 +28,40 @@ export function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
 }
 
 /**
- * Extract wiki-links from a meta note
- */
-export function extractLinksFromMetaNote(metaNote: MetaNote): WikiLink[] {
-  const allLinks: WikiLink[] = [];
-
-  // Parse links from all text fields
-  const textFields = [
-    metaNote.purpose,
-    metaNote.keyIdeas,
-    metaNote.nextExperiments,
-  ];
-
-  textFields.forEach(field => {
-    if (field) {
-      const links = parseWikiLinks(field, metaNote.repoName);
-      allLinks.push(...links);
-    }
-  });
-
-  // Also add explicit related repos
-  metaNote.relatedRepos.forEach(targetRepo => {
-    if (targetRepo !== metaNote.repoName) {
-      allLinks.push({
-        source: metaNote.repoName,
-        target: targetRepo,
-      });
-    }
-  });
-
-  // Deduplicate links
-  const uniqueLinks = new Map<string, WikiLink>();
-  allLinks.forEach(link => {
-    const key = `${link.source}->${link.target}`;
-    uniqueLinks.set(key, link);
-  });
-
-  return Array.from(uniqueLinks.values());
-}
-
-/**
- * Find wiki-links in README content
+ * Extract wiki-links from README content
  */
 export function extractLinksFromReadme(readmeContent: string, sourceRepo: string): WikiLink[] {
   return parseWikiLinks(readmeContent, sourceRepo);
 }
 
 /**
- * Generate graph data from repos and meta notes
+ * Find repo name case-insensitively
+ */
+function findRepoName(repoNames: Set<string>, target: string): string | null {
+  // Exact match first
+  if (repoNames.has(target)) return target;
+  // Case-insensitive match
+  const lower = target.toLowerCase();
+  for (const name of repoNames) {
+    if (name.toLowerCase() === lower) return name;
+  }
+  return null;
+}
+
+/**
+ * Generate graph data from repos and README contents
  */
 export function generateGraphData(
   repos: GitHubRepo[],
-  metaNotes: Record<string, MetaNote>
+  readmeContents: Record<string, string>
 ): GraphData {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const edgeSet = new Set<string>();
+  const repoNames = new Set(repos.map((r) => r.name));
 
   // Create nodes for each repo
-  repos.forEach(repo => {
-    const metaNote = metaNotes[repo.name];
-    
+  repos.forEach((repo) => {
     nodes.push({
       data: {
         id: repo.name,
@@ -96,31 +70,30 @@ export function generateGraphData(
         isPrivate: repo.private,
         topics: repo.topics,
         updatedAt: repo.updated_at,
-        hasMetaNote: !!metaNote,
-        isOrphan: false, // Will be calculated later
-        publicReady: metaNote?.publicReady || false,
+        hasReadme: !!readmeContents[repo.name],
+        isOrphan: false,
+        language: repo.language,
+        htmlUrl: repo.html_url,
       },
     });
   });
 
-  // Create edges from meta notes
-  Object.values(metaNotes).forEach(metaNote => {
-    const links = extractLinksFromMetaNote(metaNote);
-    
-    links.forEach(link => {
-      const edgeKey = [link.source, link.target].sort().join('-');
-      
-      // Only add edge if both repos exist and edge doesn't exist yet
-      if (
-        repos.some(r => r.name === link.source) &&
-        repos.some(r => r.name === link.target) &&
-        !edgeSet.has(edgeKey)
-      ) {
+  // Create edges from README wiki-links
+  Object.entries(readmeContents).forEach(([repoName, content]) => {
+    const links = extractLinksFromReadme(content, repoName);
+
+    links.forEach((link) => {
+      const resolvedTarget = findRepoName(repoNames, link.target);
+      if (!resolvedTarget) return;
+
+      const edgeKey = [link.source, resolvedTarget].sort().join('-');
+
+      if (!edgeSet.has(edgeKey)) {
         edges.push({
           data: {
             id: edgeKey,
             source: link.source,
-            target: link.target,
+            target: resolvedTarget,
             type: 'wikilink',
           },
         });
@@ -131,8 +104,8 @@ export function generateGraphData(
 
   // Create edges from shared topics
   const topicMap = new Map<string, string[]>();
-  repos.forEach(repo => {
-    repo.topics.forEach(topic => {
+  repos.forEach((repo) => {
+    repo.topics.forEach((topic) => {
       if (!topicMap.has(topic)) {
         topicMap.set(topic, []);
       }
@@ -140,19 +113,18 @@ export function generateGraphData(
     });
   });
 
-  topicMap.forEach((repoNames) => {
-    if (repoNames.length > 1) {
-      // Connect repos with the same topic
-      for (let i = 0; i < repoNames.length; i++) {
-        for (let j = i + 1; j < repoNames.length; j++) {
-          const edgeKey = [repoNames[i], repoNames[j]].sort().join('-topic');
-          
+  topicMap.forEach((repoNamesList) => {
+    if (repoNamesList.length > 1) {
+      for (let i = 0; i < repoNamesList.length; i++) {
+        for (let j = i + 1; j < repoNamesList.length; j++) {
+          const edgeKey = [repoNamesList[i], repoNamesList[j]].sort().join('-topic-');
+
           if (!edgeSet.has(edgeKey)) {
             edges.push({
               data: {
                 id: edgeKey,
-                source: repoNames[i],
-                target: repoNames[j],
+                source: repoNamesList[i],
+                target: repoNamesList[j],
                 type: 'topic',
               },
             });
@@ -165,12 +137,12 @@ export function generateGraphData(
 
   // Calculate orphan status
   const connectedNodes = new Set<string>();
-  edges.forEach(edge => {
+  edges.forEach((edge) => {
     connectedNodes.add(edge.data.source);
     connectedNodes.add(edge.data.target);
   });
 
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     node.data.isOrphan = !connectedNodes.has(node.data.id);
   });
 
@@ -178,19 +150,52 @@ export function generateGraphData(
 }
 
 /**
- * Replace wiki-links with clickable links in text
+ * Get backlinks for a specific repo (repos that link TO this repo)
  */
-export function renderWikiLinks(text: string, _onLinkClick: (repoName: string) => void): string {
-  return text.replace(WIKILINK_PATTERN, (_match, repoName) => {
-    return `<span class="wikilink" data-repo="${repoName.trim()}">${repoName.trim()}</span>`;
+export function getBacklinks(
+  repoName: string,
+  readmeContents: Record<string, string>
+): { source: string; alias?: string }[] {
+  const backlinks: { source: string; alias?: string }[] = [];
+
+  Object.entries(readmeContents).forEach(([sourceRepo, content]) => {
+    if (sourceRepo === repoName) return;
+    const links = parseWikiLinks(content, sourceRepo);
+    const linkToRepo = links.find((l) => l.target.toLowerCase() === repoName.toLowerCase());
+    if (linkToRepo) {
+      backlinks.push({ source: sourceRepo, alias: linkToRepo.alias });
+    }
   });
+
+  return backlinks;
 }
 
 /**
- * Validate wiki-link format
+ * Get outgoing links from a specific repo
  */
-export function isValidWikiLink(text: string): boolean {
-  return /^\[\[.+\]\]$/.test(text.trim());
+export function getOutlinks(
+  repoName: string,
+  readmeContents: Record<string, string>,
+  repoNames: Set<string>
+): { target: string; alias?: string }[] {
+  const content = readmeContents[repoName];
+  if (!content) return [];
+
+  const links = parseWikiLinks(content, repoName);
+  return links
+    .filter((l) => findRepoName(repoNames, l.target))
+    .map((l) => ({ target: findRepoName(repoNames, l.target)!, alias: l.alias }));
+}
+
+/**
+ * Render wiki-links as HTML spans (for README display)
+ */
+export function renderWikiLinks(text: string): string {
+  const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
+  return text.replace(regex, (_match, repoName, alias) => {
+    const displayText = alias?.trim() || repoName.trim();
+    return `<span class="wikilink" data-repo="${repoName.trim()}">${displayText}</span>`;
+  });
 }
 
 /**

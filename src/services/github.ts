@@ -1,13 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { GitHubRepo } from '../types';
 
-// GitHub OAuth configuration
-// In production, these should be environment variables
-const CLIENT_ID = 'YOUR_GITHUB_CLIENT_ID';
-const REDIRECT_URI = window.location.origin + '/callback';
-
-// For demo purposes, we'll use a Personal Access Token instead of full OAuth flow
-// In production, implement proper OAuth with server-side token exchange
 class GitHubService {
   private octokit: Octokit | null = null;
 
@@ -23,12 +16,6 @@ class GitHubService {
     return this.octokit !== null;
   }
 
-  // Get OAuth URL for GitHub login
-  getOAuthUrl(): string {
-    const scopes = 'repo read:user';
-    return `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${scopes}`;
-  }
-
   // Fetch all repositories for the authenticated user
   async fetchRepos(): Promise<GitHubRepo[]> {
     if (!this.octokit) {
@@ -40,6 +27,7 @@ class GitHubService {
       let page = 1;
       const perPage = 100;
 
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { data } = await this.octokit.repos.listForAuthenticatedUser({
           per_page: perPage,
@@ -101,64 +89,22 @@ class GitHubService {
     }
   }
 
-  // Fetch repository topics
-  async fetchTopics(owner: string, repo: string): Promise<string[]> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
-    }
+  async fetchAllReadmes(repos: GitHubRepo[]): Promise<Record<string, string>> {
+    const results: Record<string, string> = {};
+    const concurrency = 10;
 
-    try {
-      const { data } = await this.octokit.repos.getAllTopics({
-        owner,
-        repo,
+    for (let i = 0; i < repos.length; i += concurrency) {
+      const batch = repos.slice(i, i + concurrency);
+      const promises = batch.map(async (repo) => {
+        const content = await this.fetchReadme(repo.owner.login, repo.name);
+        if (content) {
+          results[repo.name] = content;
+        }
       });
-
-      return data.names;
-    } catch (error) {
-      return [];
-    }
-  }
-
-  // Check if repository has sensitive files
-  async checkSensitiveFiles(owner: string, repo: string): Promise<string[]> {
-    if (!this.octokit) {
-      throw new Error('Not authenticated');
+      await Promise.all(promises);
     }
 
-    const sensitivePatterns = [
-      '.env',
-      '.env.local',
-      '.env.production',
-      'secrets.json',
-      'credentials.json',
-      'private.key',
-      '*.pem',
-    ];
-
-    try {
-      const { data } = await this.octokit.repos.getContent({
-        owner,
-        repo,
-        path: '',
-      });
-
-      if (!Array.isArray(data)) return [];
-
-      const fileNames = data.map(file => file.name);
-      const sensitiveFiles = fileNames.filter(name => 
-        sensitivePatterns.some(pattern => {
-          if (pattern.includes('*')) {
-            const regex = new RegExp(pattern.replace('*', '.*'));
-            return regex.test(name);
-          }
-          return name === pattern;
-        })
-      );
-
-      return sensitiveFiles;
-    } catch (error) {
-      return [];
-    }
+    return results;
   }
 
   // Validate access token
