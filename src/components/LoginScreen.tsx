@@ -68,10 +68,10 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
         <div className="login-features">
           <h3>Features</h3>
           <ul>
-            <li>View all your repositories in a graph</li>
-            <li>Add meta notes to organize your thoughts</li>
-            <li>Link repos with [[wiki-links]]</li>
-            <li>Track public conversion readiness</li>
+            <li>View all your repositories in an interactive graph</li>
+            <li>Auto-parse [[wiki-links]] from READMEs to build connections</li>
+            <li>See backlinks — which repos reference each other</li>
+            <li>Filter by privacy, topics, and connection status</li>
           </ul>
         </div>
       </div>

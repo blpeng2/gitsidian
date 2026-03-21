@@ -7,7 +7,7 @@ interface FilterPanelProps {
     total: number;
     private: number;
     public: number;
-    withNotes: number;
+    withReadme: number;
     orphans: number;
   };
   onUpdateFilters: (options: Partial<FilterOptions>) => void;

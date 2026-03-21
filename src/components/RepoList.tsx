@@ -1,14 +1,14 @@
 import { useState, useMemo } from 'react';
-import { GitHubRepo, MetaNote } from '../types';
+import { GitHubRepo } from '../types';
 
 interface RepoListProps {
   repos: GitHubRepo[];
-  metaNotes: Record<string, MetaNote>;
+  readmeContents: Record<string, string>;
   selectedRepo: string | null;
   onSelectRepo: (repoName: string | null) => void;
 }
 
-function RepoList({ repos, metaNotes, selectedRepo, onSelectRepo }: RepoListProps) {
+function RepoList({ repos, readmeContents, selectedRepo, onSelectRepo }: RepoListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'created'>('updated');
 
@@ -86,7 +86,7 @@ function RepoList({ repos, metaNotes, selectedRepo, onSelectRepo }: RepoListProp
           <div className="no-repos">No repositories found</div>
         ) : (
           filteredRepos.map(repo => {
-            const hasNote = !!metaNotes[repo.name];
+            const hasReadme = !!readmeContents[repo.name];
             const isSelected = selectedRepo === repo.name;
 
             return (
@@ -100,7 +100,7 @@ function RepoList({ repos, metaNotes, selectedRepo, onSelectRepo }: RepoListProp
                     {repo.private ? '🔒' : '🌐'}
                   </span>
                   <span className="repo-name">{repo.name}</span>
-                  {hasNote && <span className="has-note" title="Has meta note">📝</span>}
+                  {hasReadme && <span className="has-readme" title="Has README loaded">📄</span>}
                 </div>
                 {repo.description && (
                   <p className="repo-description">{repo.description}</p>
