@@ -1,5 +1,5 @@
-import { useReducer, useEffect } from 'react';
-import { AppState, AppAction, MetaNote, FilterOptions } from './types';
+import { useEffect, useReducer } from 'react';
+import { AppAction, AppState, FilterOptions } from './types';
 import { githubService } from './services/github';
 import { storageService } from './services/storage';
 import { generateGraphData } from './utils/wikiLinks';
@@ -7,12 +7,11 @@ import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import './App.css';
 
-// Initial state
 const initialState: AppState = {
   isAuthenticated: false,
   accessToken: null,
   repos: [],
-  metaNotes: {},
+  readmeContents: {},
   selectedRepo: null,
   filterOptions: {
     showPrivate: true,
@@ -21,10 +20,10 @@ const initialState: AppState = {
     topicFilter: null,
   },
   isLoading: false,
+  isLoadingReadmes: false,
   error: null,
 };
 
-// Reducer function
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'SET_AUTHENTICATED':
@@ -37,13 +36,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         repos: action.payload,
+        readmeContents: {},
+        selectedRepo: action.payload.some((repo) => repo.name === state.selectedRepo)
+          ? state.selectedRepo
+          : null,
       };
-    case 'SET_META_NOTE':
+    case 'SET_README_CONTENT':
       return {
         ...state,
-        metaNotes: {
-          ...state.metaNotes,
-          [action.payload.repoName]: action.payload,
+        readmeContents: {
+          ...state.readmeContents,
+          [action.payload.repoName]: action.payload.content,
         },
       };
     case 'SET_SELECTED_REPO':
@@ -64,6 +67,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         isLoading: action.payload,
       };
+    case 'SET_LOADING_READMES':
+      return {
+        ...state,
+        isLoadingReadmes: action.payload,
+      };
     case 'SET_ERROR':
       return {
         ...state,
@@ -77,15 +85,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
 function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Initialize app from localStorage or environment token
   useEffect(() => {
     const savedToken = storageService.getAccessToken();
     const envToken = import.meta.env.VITE_GITHUB_TOKEN;
-    const savedMetaNotes = storageService.getMetaNotes();
-    const savedFilterOptions = storageService.getFilterOptions();
-    const savedSelectedRepo = storageService.getSelectedRepo();
-
-    // Use saved token if available, otherwise use env token if no saved token exists
     const tokenToUse = savedToken || (envToken && !savedToken ? envToken : null);
 
     if (tokenToUse) {
@@ -95,31 +97,32 @@ function App() {
         payload: { isAuthenticated: true, accessToken: tokenToUse },
       });
     }
-
-    // Load saved meta notes
-    Object.values(savedMetaNotes).forEach(note => {
-      dispatch({ type: 'SET_META_NOTE', payload: note });
-    });
-
-    dispatch({ type: 'SET_FILTER_OPTIONS', payload: savedFilterOptions });
-    dispatch({ type: 'SET_SELECTED_REPO', payload: savedSelectedRepo });
   }, []);
 
-  // Fetch repos when authenticated
   useEffect(() => {
     if (state.isAuthenticated && state.repos.length === 0) {
-      fetchRepos();
+      void fetchRepos();
     }
-  }, [state.isAuthenticated]);
+  }, [state.isAuthenticated, state.repos.length]);
 
-  // Fetch repositories
   const fetchRepos = async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_LOADING_READMES', payload: false });
     dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_REPOS', payload: [] });
 
     try {
       const repos = await githubService.fetchRepos();
       dispatch({ type: 'SET_REPOS', payload: repos });
+
+      dispatch({ type: 'SET_LOADING_READMES', payload: true });
+      const readmeContents = await githubService.fetchAllReadmes(repos);
+      Object.entries(readmeContents).forEach(([repoName, content]) => {
+        dispatch({
+          type: 'SET_README_CONTENT',
+          payload: { repoName, content },
+        });
+      });
     } catch (error) {
       dispatch({
         type: 'SET_ERROR',
@@ -127,10 +130,10 @@ function App() {
       });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_LOADING_READMES', payload: false });
     }
   };
 
-  // Handle login with token
   const handleLogin = async (token: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -158,7 +161,6 @@ function App() {
     }
   };
 
-  // Handle logout
   const handleLogout = () => {
     storageService.removeAccessToken();
     dispatch({
@@ -166,56 +168,35 @@ function App() {
       payload: { isAuthenticated: false, accessToken: null },
     });
     dispatch({ type: 'SET_REPOS', payload: [] });
+    dispatch({ type: 'SET_SELECTED_REPO', payload: null });
   };
 
-  // Save meta note
-  const handleSaveMetaNote = (note: MetaNote) => {
-    storageService.setMetaNote(note);
-    dispatch({ type: 'SET_META_NOTE', payload: note });
-  };
-
-  // Select repository
   const handleSelectRepo = (repoName: string | null) => {
-    storageService.setSelectedRepo(repoName);
     dispatch({ type: 'SET_SELECTED_REPO', payload: repoName });
   };
 
-  // Update filter options
   const handleUpdateFilters = (options: Partial<FilterOptions>) => {
-    const newOptions = { ...state.filterOptions, ...options };
-    storageService.setFilterOptions(newOptions);
     dispatch({ type: 'SET_FILTER_OPTIONS', payload: options });
   };
 
-  // Generate graph data
-  const graphData = generateGraphData(state.repos, state.metaNotes);
-
-  // Get selected repo data
-  const selectedRepoData = state.repos.find(r => r.name === state.selectedRepo);
-  const selectedMetaNote = state.selectedRepo ? state.metaNotes[state.selectedRepo] : null;
+  const graphData = generateGraphData(state.repos, state.readmeContents);
+  const selectedRepoData = state.repos.find((repo) => repo.name === state.selectedRepo) || null;
 
   if (!state.isAuthenticated) {
-    return (
-      <LoginScreen
-        onLogin={handleLogin}
-        isLoading={state.isLoading}
-        error={state.error}
-      />
-    );
+    return <LoginScreen onLogin={handleLogin} isLoading={state.isLoading} error={state.error} />;
   }
 
   return (
     <MainLayout
       repos={state.repos}
-      metaNotes={state.metaNotes}
-      selectedRepo={selectedRepoData || null}
-      selectedMetaNote={selectedMetaNote}
+      readmeContents={state.readmeContents}
+      selectedRepo={selectedRepoData}
       graphData={graphData}
       filterOptions={state.filterOptions}
       isLoading={state.isLoading}
+      isLoadingReadmes={state.isLoadingReadmes}
       error={state.error}
       onSelectRepo={handleSelectRepo}
-      onSaveMetaNote={handleSaveMetaNote}
       onUpdateFilters={handleUpdateFilters}
       onRefresh={fetchRepos}
       onLogout={handleLogout}
