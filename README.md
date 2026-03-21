@@ -119,3 +119,4 @@ When you first open Gitsidian, paste your token into the login screen. The app w
 ## License
 
 MIT
+# Deployment trigger
