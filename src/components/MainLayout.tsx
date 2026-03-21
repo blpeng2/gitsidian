@@ -1,21 +1,20 @@
-import { useState } from 'react';
-import { GitHubRepo, MetaNote, GraphData, FilterOptions } from '../types';
+import { useMemo, useState, type MouseEvent } from 'react';
+import { FilterOptions, GitHubRepo, GraphData } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
-import MetaNoteEditor from './MetaNoteEditor';
 import FilterPanel from './FilterPanel';
+import { getBacklinks, getOutlinks, renderWikiLinks } from '../utils/wikiLinks';
 
 interface MainLayoutProps {
   repos: GitHubRepo[];
-  metaNotes: Record<string, MetaNote>;
+  readmeContents: Record<string, string>;
   selectedRepo: GitHubRepo | null;
-  selectedMetaNote: MetaNote | null;
   graphData: GraphData;
   filterOptions: FilterOptions;
   isLoading: boolean;
+  isLoadingReadmes: boolean;
   error: string | null;
   onSelectRepo: (repoName: string | null) => void;
-  onSaveMetaNote: (note: MetaNote) => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
   onRefresh: () => void;
   onLogout: () => void;
@@ -23,55 +22,71 @@ interface MainLayoutProps {
 
 function MainLayout({
   repos,
-  metaNotes,
+  readmeContents,
   selectedRepo,
-  selectedMetaNote,
   graphData,
   filterOptions,
   isLoading,
+  isLoadingReadmes,
   error,
   onSelectRepo,
-  onSaveMetaNote,
   onUpdateFilters,
   onRefresh,
   onLogout,
 }: MainLayoutProps) {
   const [showSidebar, setShowSidebar] = useState(true);
 
-  // Filter repos based on options
-  const filteredRepos = repos.filter(repo => {
-    if (!filterOptions.showPrivate && repo.private) return false;
-    if (!filterOptions.showPublic && !repo.private) return false;
-    if (!filterOptions.showOrphans) {
-      const isOrphan = graphData.nodes.find(n => n.data.id === repo.name)?.data.isOrphan;
-      if (isOrphan) return false;
-    }
-    if (filterOptions.topicFilter) {
-      if (!repo.topics.includes(filterOptions.topicFilter)) return false;
-    }
-    return true;
-  });
+  const filteredRepos = useMemo(
+    () =>
+      repos.filter((repo) => {
+        if (!filterOptions.showPrivate && repo.private) return false;
+        if (!filterOptions.showPublic && !repo.private) return false;
+        if (!filterOptions.showOrphans) {
+          const isOrphan = graphData.nodes.find((node) => node.data.id === repo.name)?.data.isOrphan;
+          if (isOrphan) return false;
+        }
+        if (filterOptions.topicFilter && !repo.topics.includes(filterOptions.topicFilter)) return false;
+        return true;
+      }),
+    [repos, filterOptions, graphData.nodes]
+  );
 
-  // Get all unique topics
-  const allTopics = Array.from(new Set(repos.flatMap(repo => repo.topics)));
+  const allTopics = useMemo(() => Array.from(new Set(repos.flatMap((repo) => repo.topics))), [repos]);
 
-  // Stats
-  const stats = {
-    total: repos.length,
-    private: repos.filter(r => r.private).length,
-    public: repos.filter(r => !r.private).length,
-    withNotes: Object.keys(metaNotes).length,
-    orphans: graphData.nodes.filter(n => n.data.isOrphan).length,
+  const stats = useMemo(
+    () => ({
+      total: repos.length,
+      private: repos.filter((repo) => repo.private).length,
+      public: repos.filter((repo) => !repo.private).length,
+      withReadme: Object.keys(readmeContents).length,
+      orphans: graphData.nodes.filter((node) => node.data.isOrphan).length,
+    }),
+    [repos, readmeContents, graphData.nodes]
+  );
+
+  const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
+  const backlinks = selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : [];
+  const outlinks = selectedRepo
+    ? getOutlinks(selectedRepo.name, readmeContents, new Set(repos.map((repo) => repo.name)))
+    : [];
+
+  const handleReadmeClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (!target.classList.contains('wikilink')) return;
+    const repoName = target.getAttribute('data-repo')?.trim();
+    if (!repoName) return;
+    const resolvedRepo = repos.find((repo) => repo.name.toLowerCase() === repoName.toLowerCase());
+    if (!resolvedRepo) return;
+    onSelectRepo(resolvedRepo.name);
   };
 
   return (
     <div className="main-layout">
-      {/* Header */}
       <header className="main-header">
         <div className="header-left">
           <h1 className="logo">Gitsidian</h1>
           <span className="stats">
-            {stats.total} repos · {stats.withNotes} notes · {stats.orphans} orphans
+            {stats.total} repos · {stats.withReadme} with README · {stats.orphans} orphans
           </span>
         </div>
         <div className="header-right">
@@ -87,16 +102,10 @@ function MainLayout({
         </div>
       </header>
 
-      {/* Error display */}
-      {error && (
-        <div className="error-banner">
-          {error}
-        </div>
-      )}
+      {error && <div className="error-banner">{error}</div>}
+      {isLoadingReadmes && <div className="loading-readmes">⏳ Loading README files...</div>}
 
-      {/* Main content */}
       <div className="main-content">
-        {/* Graph view */}
         <div className="graph-container">
           <GraphView
             data={graphData}
@@ -106,7 +115,6 @@ function MainLayout({
           />
         </div>
 
-        {/* Sidebar */}
         {showSidebar && (
           <aside className="sidebar">
             <FilterPanel
@@ -118,18 +126,84 @@ function MainLayout({
 
             <RepoList
               repos={filteredRepos}
-              metaNotes={metaNotes}
+              readmeContents={readmeContents}
               selectedRepo={selectedRepo?.name || null}
               onSelectRepo={onSelectRepo}
             />
 
             {selectedRepo && (
-              <MetaNoteEditor
-                repo={selectedRepo}
-                metaNote={selectedMetaNote}
-                allRepos={repos}
-                onSave={onSaveMetaNote}
-              />
+              <div className="readme-viewer">
+                <div className="readme-viewer-header">
+                  <h3>{selectedRepo.name}</h3>
+                  <a
+                    className="github-link"
+                    href={selectedRepo.html_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    View on GitHub
+                  </a>
+                </div>
+
+                <div className="readme-meta">
+                  {selectedRepo.language && <span className="language-badge">{selectedRepo.language}</span>}
+                  {selectedRepo.topics.map((topic) => (
+                    <span key={topic} className="topic-tag">
+                      {topic}
+                    </span>
+                  ))}
+                </div>
+
+                {selectedReadme ? (
+                  <div
+                    className="readme-content"
+                    onClick={handleReadmeClick}
+                    dangerouslySetInnerHTML={{ __html: renderWikiLinks(selectedReadme) }}
+                  />
+                ) : (
+                  <div className="no-readme">No README found</div>
+                )}
+
+                <div className="links-section">
+                  <h4>Linked from</h4>
+                  {backlinks.length > 0 ? (
+                    <div className="links-list">
+                      {backlinks.map((backlink) => (
+                        <div
+                          key={backlink.source}
+                          className="link-item"
+                          onClick={() => onSelectRepo(backlink.source)}
+                        >
+                          <span>{backlink.source}</span>
+                          {backlink.alias && <span>as {backlink.alias}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="no-links">No backlinks</div>
+                  )}
+                </div>
+
+                <div className="links-section">
+                  <h4>Links to</h4>
+                  {outlinks.length > 0 ? (
+                    <div className="links-list">
+                      {outlinks.map((outlink) => (
+                        <div
+                          key={`${outlink.target}-${outlink.alias || ''}`}
+                          className="link-item"
+                          onClick={() => onSelectRepo(outlink.target)}
+                        >
+                          <span>{outlink.target}</span>
+                          {outlink.alias && <span>as {outlink.alias}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="no-links">No outgoing links</div>
+                  )}
+                </div>
+              </div>
             )}
           </aside>
         )}

@@ -344,13 +344,9 @@ body {
   background: var(--accent-warning);
 }
 
-.legend-dot.with-note {
+.legend-dot.has-readme {
   background: transparent;
   border: 3px double var(--accent-primary);
-}
-
-.legend-dot.ready {
-  background: var(--accent-success);
 }
 
 .legend-line {
@@ -552,7 +548,7 @@ body {
   color: var(--text-primary);
 }
 
-.has-note {
+.has-readme {
   margin-left: auto;
   font-size: 0.9rem;
 }
@@ -598,15 +594,15 @@ body {
   color: var(--text-secondary);
 }
 
-/* Meta Note Editor */
-.meta-note-editor {
+.readme-viewer {
   border-top: 1px solid var(--border-color);
   max-height: 50vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-.meta-note-header {
+.readme-viewer-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -614,78 +610,85 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
-.meta-note-header h3 {
+.readme-viewer-header h3 {
   font-size: 1rem;
   color: var(--text-primary);
 }
 
-.save-btn {
+.github-link {
+  color: var(--accent-secondary);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.github-link:hover {
+  text-decoration: underline;
+}
+
+.readme-meta {
+  display: flex;
+  gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: var(--accent-success);
-  border: none;
-  border-radius: 6px;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.language-badge {
+  background: var(--accent-primary);
   color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
 }
 
-.save-btn:hover:not(:disabled) {
-  background: #219a52;
-}
-
-.save-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.meta-note-form {
+.readme-content {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-primary);
 }
 
-.form-field {
-  margin-bottom: 1rem;
+.readme-content .wikilink {
+  color: var(--accent-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
 }
 
-.form-field label {
-  display: block;
+.readme-content .wikilink:hover {
+  text-decoration-style: solid;
+}
+
+.no-readme {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.links-section {
+  border-top: 1px solid var(--border-color);
+  padding: 0.75rem 1rem;
+}
+
+.links-section h4 {
   font-size: 0.85rem;
-  font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-.form-field textarea,
-.form-field input[type="text"] {
-  width: 100%;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  resize: vertical;
-  font-family: inherit;
-}
-
-.form-field textarea:focus,
-.form-field input[type="text"]:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.related-repos {
+.links-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
 }
 
-.related-repo-tag {
+.link-item {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
@@ -694,201 +697,91 @@ body {
   border-radius: 4px;
   font-size: 0.85rem;
   color: var(--accent-secondary);
-}
-
-.related-repo-tag button {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1rem;
-  padding: 0 0.25rem;
-}
-
-.related-repo-tag button:hover {
-  color: var(--accent-danger);
-}
-
-.add-repo-btn {
-  background: none;
-  border: 1px dashed var(--border-color);
-  padding: 0.25rem 0.75rem;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.add-repo-btn:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
-}
-
-.repo-picker {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  margin-top: 0.5rem;
-  overflow: hidden;
-}
-
-.repo-picker input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  border: none;
-  border-bottom: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.repo-picker input:focus {
-  outline: none;
-}
-
-.repo-picker-list {
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.repo-picker-item {
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
   transition: background 0.2s;
 }
 
-.repo-picker-item:hover {
-  background: var(--bg-secondary);
+.link-item:hover {
+  background: var(--accent-primary);
+  color: white;
 }
 
-.repo-picker-item .private {
-  color: var(--accent-warning);
+.no-links {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
 }
 
-.repo-picker-item .public {
-  color: var(--accent-primary);
-}
-
-.tags-container {
+.loading-readmes {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
   align-items: center;
-  background: var(--bg-tertiary);
+  gap: 0.5rem;
+  padding: 0.5rem 1.5rem;
+  background: rgba(74, 144, 217, 0.1);
+  border-bottom: 1px solid var(--accent-primary);
+  color: var(--accent-primary);
+  font-size: 0.85rem;
+}
+
+/* Graph Search */
+.graph-search {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10;
+}
+
+.graph-search-input {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 0.5rem;
-}
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: var(--accent-primary);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: white;
-}
-
-.tag button {
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  font-size: 1rem;
-  padding: 0 0.15rem;
-}
-
-.tag button:hover {
-  color: white;
-}
-
-.tag-input {
-  flex: 1;
-  min-width: 80px;
-  background: none !important;
-  border: none !important;
-  padding: 0.25rem !important;
   color: var(--text-primary);
   font-size: 0.9rem;
+  width: 200px;
 }
 
-.tag-input:focus {
-  outline: none !important;
+.graph-search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
 }
 
-.public-section {
-  background: var(--bg-tertiary);
-  padding: 1rem;
+.graph-search-input::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Context Menu */
+.context-menu {
+  position: fixed;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  margin-top: 0.5rem;
-}
-
-.readiness-bar {
-  position: relative;
-  height: 24px;
-  background: var(--bg-secondary);
-  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 1000;
   overflow: hidden;
-  margin-bottom: 1rem;
+  min-width: 160px;
 }
 
-.readiness-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-warning), var(--accent-success));
-  transition: width 0.3s ease;
-}
-
-.readiness-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.checklist {
-  margin-bottom: 1rem;
-}
-
-.checklist-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  cursor: pointer;
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
   color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.checklist-item input {
-  accent-color: var(--accent-success);
-}
-
-.public-ready-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: left;
   cursor: pointer;
-  font-weight: 600;
-  color: var(--accent-success);
+  transition: background 0.15s;
 }
 
-.public-ready-toggle input {
-  accent-color: var(--accent-success);
-  width: 18px;
-  height: 18px;
+.context-menu button:hover {
+  background: var(--accent-primary);
+}
+
+/* Search match highlight for legend */
+.legend-dot.search-match {
+  background: #f1c40f;
 }
 
 /* Scrollbar styling */
