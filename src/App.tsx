@@ -77,18 +77,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
 function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Initialize app from localStorage
+  // Initialize app from localStorage or environment token
   useEffect(() => {
     const savedToken = storageService.getAccessToken();
+    const envToken = import.meta.env.VITE_GITHUB_TOKEN;
     const savedMetaNotes = storageService.getMetaNotes();
     const savedFilterOptions = storageService.getFilterOptions();
     const savedSelectedRepo = storageService.getSelectedRepo();
 
-    if (savedToken) {
-      githubService.setAccessToken(savedToken);
+    // Use saved token if available, otherwise use env token if no saved token exists
+    const tokenToUse = savedToken || (envToken && !savedToken ? envToken : null);
+
+    if (tokenToUse) {
+      githubService.setAccessToken(tokenToUse);
       dispatch({
         type: 'SET_AUTHENTICATED',
-        payload: { isAuthenticated: true, accessToken: savedToken },
+        payload: { isAuthenticated: true, accessToken: tokenToUse },
       });
     }
 
