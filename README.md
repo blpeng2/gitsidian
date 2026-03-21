@@ -2,6 +2,12 @@
 
 A visual knowledge base for your GitHub repositories. Gitsidian helps you understand, organize, and document your repos with an interactive graph view and wiki-style linking.
 
+## Quick Start
+
+**Use now**: Visit https://blpeng2.github.io/gitsidian/ and enter your GitHub Personal Access Token on first visit.
+
+**Fork for personal use**: See [Use as Your Own](#use-as-your-own-personal-instance) below for a private instance with auto-login.
+
 ## What It Does
 
 Gitsidian connects to your GitHub account and creates a visual map of all your repositories. You can:
@@ -42,6 +48,41 @@ npm run dev
 ```
 
 The app will be available at `http://localhost:5173`.
+
+## Use as Your Own (Personal Instance)
+
+Deploy your own private instance with auto-login. Your token is baked into the build, so you never have to enter it again.
+
+1. **Fork this repo**
+   - Click Fork on GitHub
+   - Set the repository to **Private** (important for keeping your token secure)
+   - Name it exactly `gitsidian`
+
+2. **Add your GitHub token as a repository secret**
+   - Go to Settings → Secrets and variables → Actions
+   - Click **New repository secret**
+   - Name: `VITE_GITHUB_TOKEN`
+   - Value: Your GitHub Personal Access Token (needs `repo` and `read:user` scopes)
+   - Click **Add secret**
+
+3. **Enable GitHub Actions for Pages**
+   - Go to Settings → Pages
+   - Under "Build and deployment", select **GitHub Actions** as the source
+
+4. **Trigger deployment**
+   ```bash
+   git commit --allow-empty -m "trigger deployment"
+   git push origin main
+   ```
+   Or push any change to `main`.
+
+5. **Visit your instance**
+   ```
+   https://<your-username>.github.io/gitsidian/
+   ```
+   You are auto-logged in. No password prompt.
+
+**Security note**: Your token is embedded in the built JavaScript. Keep your repository **private** to prevent others from accessing your token.
 
 ## GitHub Pages Deployment
 
