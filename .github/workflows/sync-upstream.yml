@@ -1,0 +1,67 @@
+name: Sync with upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Only run on forks, not on the source repo
+    if: github.repository != 'blpeng2/gitsidian'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/blpeng2/gitsidian.git
+
+      - name: Fetch upstream
+        run: git fetch upstream main
+
+      - name: Check if behind upstream
+        id: check
+        run: |
+          BEHIND=$(git rev-list --count HEAD..upstream/main)
+          echo "behind=$BEHIND" >> $GITHUB_OUTPUT
+          echo "Commits behind upstream: $BEHIND"
+
+      - name: Merge upstream (fast-forward or merge)
+        if: steps.check.outputs.behind != '0'
+        id: merge
+        run: |
+          git merge upstream/main --no-edit || echo "conflict=true" >> $GITHUB_OUTPUT
+
+      - name: Push if merge succeeded
+        if: steps.check.outputs.behind != '0' && steps.merge.outputs.conflict != 'true'
+        run: git push origin main
+
+      - name: Create PR on conflict
+        if: steps.merge.outputs.conflict == 'true'
+        run: |
+          git merge --abort
+          git checkout -b sync-upstream-${{ github.run_id }}
+          git merge upstream/main --no-edit || true
+          git add -A
+          git commit -m "chore: sync with upstream (conflicts need resolution)" || true
+          git push origin sync-upstream-${{ github.run_id }}
+          gh pr create \
+            --title "chore: sync with upstream blpeng2/gitsidian" \
+            --body "Automatic sync with upstream encountered merge conflicts. Please resolve manually." \
+            --base main \
+            --head sync-upstream-${{ github.run_id }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
