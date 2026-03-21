@@ -34,6 +34,8 @@ jobs:
         run: npm ci
       
       - name: Build
+        env:
+          VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
         run: npm run build
       
       - name: Setup Pages
