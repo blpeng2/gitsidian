@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages - Updated
 
 on:
   push:
@@ -44,6 +44,6 @@ jobs:
         with:
           path: './dist'
       
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages - Updated
         id: deployment
         uses: actions/deploy-pages@v4
