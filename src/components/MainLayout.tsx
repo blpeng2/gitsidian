@@ -50,7 +50,6 @@ function MainLayout({
   onSelectRepo,
   onCloseTab,
   onRefresh,
-  onLogout,
   onCreateRepo,
   onSaveReadme,
   onShowCreateModal,
@@ -123,9 +122,6 @@ function MainLayout({
           <button onClick={onRefresh} className="refresh-btn" disabled={isLoading}>
             {isLoading ? 'Loading...' : '↻ Refresh'}
           </button>
-          <button onClick={onLogout} className="logout-btn">
-            Logout
-          </button>
         </div>
       </header>
 
@@ -176,7 +172,7 @@ function MainLayout({
                   <ReadmeEditor
                     repoName={selectedRepo.name}
                     initialContent={selectedReadme}
-                    onSave={(content) => void onSaveReadme(selectedRepo.name, content)}
+                    onSave={(content: string) => void onSaveReadme(selectedRepo.name, content)}
                     onCancel={() => onEditReadme(false)}
                   />
                 ) : (
