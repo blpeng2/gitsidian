@@ -271,15 +271,9 @@ function ReadmeEditor({
   }, [showWikiPicker, showTopicPicker]);
 
   useEffect(() => {
-    const handleBlur = () => {
-      if (contentRef.current !== lastSavedContentRef.current) {
-        void saveToGitHub();
-      }
-    };
-
     const handleVisibility = () => {
-      if (document.hidden && contentRef.current !== lastSavedContentRef.current) {
-        void saveToGitHub();
+      if (document.hidden) {
+        storageService.setDraft(repoName, contentRef.current);
       }
     };
 
@@ -290,19 +284,17 @@ function ReadmeEditor({
       }
     };
 
-    window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [saveToGitHub]);
+  }, [repoName, saveToGitHub]);
 
   return (
     <div className="editor-fullscreen">

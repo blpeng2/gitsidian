@@ -268,6 +268,11 @@ function App() {
     try {
       const newRepo = await githubService.createRepo(name, description, isPrivate);
       dispatch({ type: 'ADD_REPO', payload: newRepo });
+      const displayName = newRepo.name.replace(/^gitsidian-/, '');
+      dispatch({
+        type: 'SET_README_CONTENT',
+        payload: { repoName: newRepo.name, content: `# ${displayName}\n\n${description || ''}\n` },
+      });
       dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: false });
       dispatch({ type: 'SET_SELECTED_REPO', payload: newRepo.name });
     } catch (error) {

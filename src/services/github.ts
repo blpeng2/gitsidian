@@ -141,7 +141,17 @@ class GitHubService {
       name: fullName,
       description,
       private: isPrivate,
-      auto_init: true,
+      auto_init: false,
+    });
+
+    const readmeContent = `# ${name}\n\n${description || ''}\n`;
+    const encoded = btoa(unescape(encodeURIComponent(readmeContent)));
+    await this.octokit.repos.createOrUpdateFileContents({
+      owner: repo.owner.login,
+      repo: repo.name,
+      path: 'README.md',
+      message: 'Initial README',
+      content: encoded,
     });
 
     return {
