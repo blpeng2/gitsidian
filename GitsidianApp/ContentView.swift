@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct ContentView: View {
-    @Binding var showAIPanel: Bool
-    @Binding var selectedProvider: String
-    @Binding var devMode: Bool
+    @State private var showAIPanel = false
+    @State private var selectedProvider = "chatgpt"
+    @State private var devMode = false
     @StateObject private var aiStore = AIPanelWebViewStore()
     
     var body: some View {
@@ -23,5 +23,11 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onReceive(NotificationCenter.default.publisher(for: .toggleAIPanel)) { _ in
+            showAIPanel.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .toggleDevMode)) { _ in
+            devMode.toggle()
+        }
     }
 }

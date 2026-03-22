@@ -2,18 +2,10 @@ import SwiftUI
 
 @main
 struct GitsidianApp: App {
-    @AppStorage("showAIPanel") private var showAIPanel = false
-    @AppStorage("selectedProvider") private var selectedProvider = "chatgpt"
-    @AppStorage("devMode") private var devMode = false
-    
     var body: some Scene {
         WindowGroup {
-            ContentView(
-                showAIPanel: $showAIPanel,
-                selectedProvider: $selectedProvider,
-                devMode: $devMode
-            )
-            .frame(minWidth: 900, minHeight: 600)
+            ContentView()
+                .frame(minWidth: 900, minHeight: 600)
         }
         .windowStyle(.titleBar)
         .commands {
@@ -25,8 +17,10 @@ struct GitsidianApp: App {
             }
             
             CommandMenu("Panels") {
-                Toggle("AI Panel", isOn: $showAIPanel)
-                    .keyboardShortcut("\\", modifiers: [.command])
+                Button("Toggle AI Panel") {
+                    NotificationCenter.default.post(name: .toggleAIPanel, object: nil)
+                }
+                .keyboardShortcut("\\", modifiers: [.command])
                 
                 Divider()
                 
@@ -42,7 +36,9 @@ struct GitsidianApp: App {
             }
             
             CommandMenu("Debug") {
-                Toggle("Dev Mode (localhost)", isOn: $devMode)
+                Button("Toggle Dev Mode") {
+                    NotificationCenter.default.post(name: .toggleDevMode, object: nil)
+                }
                 
                 Button("Reload Web App") {
                     NotificationCenter.default.post(name: .reloadWebApp, object: nil)
@@ -59,4 +55,6 @@ extension Notification.Name {
     static let switchToGraph = Notification.Name("switchToGraph")
     static let reloadWebApp = Notification.Name("reloadWebApp")
     static let oauthCallback = Notification.Name("oauthCallback")
+    static let toggleAIPanel = Notification.Name("toggleAIPanel")
+    static let toggleDevMode = Notification.Name("toggleDevMode")
 }
