@@ -10,7 +10,7 @@ let package = Package(
         .executableTarget(
             name: "GitsidianApp",
             path: ".",
-            exclude: ["Package.swift", "Info.plist", "GitsidianApp.entitlements"],
+            exclude: ["Package.swift", "Info.plist", "GitsidianApp.entitlements", "build.sh", "bundle.sh"],
             resources: [
                 .copy("Resources")
             ]
