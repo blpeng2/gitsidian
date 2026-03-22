@@ -7,10 +7,35 @@ struct MainWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+            config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+            config.preferences.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
         
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
+
+        // Capture JS errors
+        let errorScript = WKUserScript(
+            source: """
+                window.onerror = function(msg, url, line, col, error) {
+                    window.webkit.messageHandlers.jsError.postMessage(
+                        'JS Error: ' + msg + ' at ' + url + ':' + line + ':' + col
+                    );
+                };
+                window.addEventListener('unhandledrejection', function(e) {
+                    window.webkit.messageHandlers.jsError.postMessage(
+                        'Unhandled rejection: ' + e.reason
+                    );
+                });
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(errorScript)
+        config.userContentController.add(context.coordinator, name: "jsError")
         
         loadContent(webView)
         setupNotificationObservers(webView, context: context)
@@ -141,7 +166,7 @@ struct MainWebView: NSViewRepresentable {
         Coordinator()
     }
     
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var lastDevMode = false
         var observers: [Any] = []
         
@@ -163,6 +188,44 @@ struct MainWebView: NSViewRepresentable {
                 }
             }
             decisionHandler(.allow)
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            print("[Gitsidian] didFinish:", webView.url?.absoluteString ?? "nil")
+
+            // Diagnose page state
+            webView.evaluateJavaScript("""
+                (function() {
+                    var result = {
+                        title: document.title,
+                        bodyLength: document.body ? document.body.innerHTML.length : 0,
+                        rootContent: document.getElementById('root') ? document.getElementById('root').innerHTML.substring(0, 500) : 'NO #root',
+                        scripts: Array.from(document.querySelectorAll('script')).map(function(s) { return { src: s.src, type: s.type }; }),
+                        links: Array.from(document.querySelectorAll('link[rel=stylesheet]')).map(function(l) { return { href: l.href, loaded: l.sheet !== null }; }),
+                        errors: []
+                    };
+                    return JSON.stringify(result, null, 2);
+                })()
+            """) { result, error in
+                if let json = result as? String {
+                    print("[Gitsidian] Page diagnostics:", json)
+                }
+                if let error = error {
+                    print("[Gitsidian] JS eval error:", error)
+                }
+            }
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            print("[Gitsidian] \(message.name):", message.body)
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            print("[Gitsidian] didFailProvisional:", error)
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            print("[Gitsidian] didFail:", error)
         }
     }
 }
