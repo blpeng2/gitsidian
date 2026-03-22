@@ -75,6 +75,7 @@ jobs:
           codesign --force --sign - --options runtime "$BUNDLE_DIR"
           
           ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-arm64.zip
+          hdiutil create -volname "Gitsidian" -srcfolder Gitsidian.app -ov -format UDZO Gitsidian-macOS-arm64.dmg
           rm -rf "$BUNDLE_DIR"
       
       - name: Build and bundle (x86_64)
@@ -107,6 +108,7 @@ jobs:
           codesign --force --sign - --options runtime "$BUNDLE_DIR"
           
           ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-x86_64.zip
+          hdiutil create -volname "Gitsidian" -srcfolder Gitsidian.app -ov -format UDZO Gitsidian-macOS-x86_64.dmg
           rm -rf "$BUNDLE_DIR"
       
       - name: Upload artifacts
@@ -115,7 +117,9 @@ jobs:
           name: Gitsidian-macOS
           path: |
             GitsidianApp/Gitsidian-macOS-arm64.zip
+            GitsidianApp/Gitsidian-macOS-arm64.dmg
             GitsidianApp/Gitsidian-macOS-x86_64.zip
+            GitsidianApp/Gitsidian-macOS-x86_64.dmg
           retention-days: 30
       
       - name: Create GitHub Release
@@ -128,17 +132,21 @@ jobs:
             ## Gitsidian macOS App v${{ steps.version.outputs.VERSION }}
             
             ### Download
-            | File | Architecture |
-            |------|-------------|
-            | `Gitsidian-macOS-arm64.zip` | Apple Silicon (M1/M2/M3/M4) |
-            | `Gitsidian-macOS-x86_64.zip` | Intel Mac |
+            | File | Architecture | Format |
+            |------|-------------|--------|
+            | `Gitsidian-macOS-arm64.dmg` | Apple Silicon (M1/M2/M3/M4) | DMG |
+            | `Gitsidian-macOS-arm64.zip` | Apple Silicon (M1/M2/M3/M4) | ZIP |
+            | `Gitsidian-macOS-x86_64.dmg` | Intel Mac | DMG |
+            | `Gitsidian-macOS-x86_64.zip` | Intel Mac | ZIP |
             
-            Extract the ZIP and drag `Gitsidian.app` to your Applications folder.
+            Extract ZIP or mount DMG, then drag `Gitsidian.app` to Applications.
             
             **Requirements:** macOS 14 (Sonoma) or later
             
             > ⚠️ First launch: Right-click → Open (bypasses Gatekeeper for unsigned apps)
           files: |
             GitsidianApp/Gitsidian-macOS-arm64.zip
+            GitsidianApp/Gitsidian-macOS-arm64.dmg
             GitsidianApp/Gitsidian-macOS-x86_64.zip
+            GitsidianApp/Gitsidian-macOS-x86_64.dmg
           generate_release_notes: true
