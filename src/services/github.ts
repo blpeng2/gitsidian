@@ -2,7 +2,6 @@ import { Octokit } from '@octokit/rest';
 import { GitHubRepo } from '../types';
 
 const OAUTH_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || '';
-const OAUTH_WORKER_URL = import.meta.env.VITE_OAUTH_WORKER_URL || '';
 
 class GitHubService {
   private octokit: Octokit | null = null;
@@ -26,32 +25,6 @@ class GitHubService {
 
   hasOAuthClientId(): boolean {
     return OAUTH_CLIENT_ID.trim().length > 0;
-  }
-
-  async handleOAuthCallback(code: string): Promise<string> {
-    if (!OAUTH_WORKER_URL) {
-      throw new Error('Missing VITE_OAUTH_WORKER_URL');
-    }
-
-    const response = await fetch(`${OAUTH_WORKER_URL}/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ code }),
-    });
-
-    if (!response.ok) {
-      const error = (await response.json()) as { error?: string };
-      throw new Error(error.error || 'OAuth exchange failed');
-    }
-
-    const data = (await response.json()) as { access_token?: string };
-    if (!data.access_token) {
-      throw new Error('OAuth exchange did not return an access token');
-    }
-
-    return data.access_token;
   }
 
   // Initialize with access token

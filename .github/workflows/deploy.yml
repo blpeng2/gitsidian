@@ -34,7 +34,6 @@ jobs:
         env:
           VITE_GITHUB_TOKEN: ${{ secrets.VITE_GITHUB_TOKEN }}
           VITE_OAUTH_CLIENT_ID: ${{ secrets.VITE_OAUTH_CLIENT_ID }}
-          VITE_OAUTH_WORKER_URL: ${{ secrets.VITE_OAUTH_WORKER_URL }}
         run: npm run build
       
       - name: Setup Pages

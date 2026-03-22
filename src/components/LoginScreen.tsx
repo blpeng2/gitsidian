@@ -92,7 +92,7 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
 
           {!githubService.hasOAuthClientId() && (
             <p className="oauth-help">
-              Set <code>VITE_OAUTH_CLIENT_ID</code> and <code>VITE_OAUTH_WORKER_URL</code> to enable GitHub OAuth.
+              Set <code>VITE_OAUTH_CLIENT_ID</code> to enable GitHub OAuth.
             </p>
           )}
         </form>
