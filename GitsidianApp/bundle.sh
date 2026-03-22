@@ -9,7 +9,7 @@ echo "=== Building Gitsidian.app ==="
 
 echo "Building web app..."
 cd "$PROJECT_ROOT"
-VITE_BASE_PATH=/ npm run build -- --outDir GitsidianApp/Resources/web
+VITE_BASE_PATH=./ npm run build -- --outDir GitsidianApp/Resources/web
 
 echo "Building Swift app (release)..."
 cd GitsidianApp

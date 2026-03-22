@@ -43,7 +43,7 @@ jobs:
       - name: Build web app
         env:
           VITE_OAUTH_CLIENT_ID: ${{ secrets.VITE_OAUTH_CLIENT_ID }}
-        run: VITE_BASE_PATH=/ npm run build -- --outDir GitsidianApp/Resources/web
+        run: VITE_BASE_PATH=./ npm run build -- --outDir GitsidianApp/Resources/web
       
       - name: Build and bundle (arm64)
         run: |
