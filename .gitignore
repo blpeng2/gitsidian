@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Swift build
+GitsidianApp/.build/
+dist-desktop/
