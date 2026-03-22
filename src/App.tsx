@@ -13,6 +13,7 @@ const initialState: AppState = {
   repos: [],
   readmeContents: {},
   selectedRepo: null,
+  openTabs: [],
   filterOptions: {
     showPrivate: true,
     showPublic: true,
@@ -36,6 +37,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         accessToken: action.payload.accessToken,
       };
     case 'SET_REPOS':
+      const availableRepoNames = new Set(action.payload.map((repo) => repo.name));
+      const openTabs = state.openTabs.filter((repoName) => availableRepoNames.has(repoName));
       return {
         ...state,
         repos: action.payload,
@@ -43,6 +46,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         selectedRepo: action.payload.some((repo) => repo.name === state.selectedRepo)
           ? state.selectedRepo
           : null,
+        openTabs,
       };
     case 'ADD_REPO':
       return {
@@ -58,10 +62,37 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     case 'SET_SELECTED_REPO':
+      if (action.payload === null) {
+        return { ...state, selectedRepo: null };
+      }
       return {
         ...state,
         selectedRepo: action.payload,
+        openTabs: state.openTabs.includes(action.payload)
+          ? state.openTabs
+          : [...state.openTabs, action.payload],
       };
+    case 'OPEN_TAB': {
+      const tabs = state.openTabs.includes(action.payload)
+        ? state.openTabs
+        : [...state.openTabs, action.payload];
+      return {
+        ...state,
+        openTabs: tabs,
+        selectedRepo: action.payload,
+      };
+    }
+    case 'CLOSE_TAB': {
+      const tabs = state.openTabs.filter((tab) => tab !== action.payload);
+      const newSelected = action.payload === state.selectedRepo
+        ? tabs[tabs.length - 1] || null
+        : state.selectedRepo;
+      return {
+        ...state,
+        openTabs: tabs,
+        selectedRepo: newSelected,
+      };
+    }
     case 'SET_FILTER_OPTIONS':
       return {
         ...state,
@@ -285,7 +316,9 @@ function App() {
       error={state.error}
       showCreateModal={state.showCreateModal}
       isEditingReadme={state.isEditingReadme}
+      openTabs={state.openTabs}
       onSelectRepo={handleSelectRepo}
+      onCloseTab={(repoName: string) => dispatch({ type: 'CLOSE_TAB', payload: repoName })}
       onUpdateFilters={handleUpdateFilters}
       onRefresh={fetchRepos}
       onLogout={handleLogout}

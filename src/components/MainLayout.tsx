@@ -2,10 +2,12 @@ import { useMemo, type MouseEvent } from 'react';
 import { FilterOptions, GitHubRepo, GraphData } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
-import { getBacklinks, getOutlinks, renderWikiLinks } from '../utils/wikiLinks';
+import { getBacklinks, getOutlinks } from '../utils/wikiLinks';
+import { renderMarkdown } from '../utils/markdown';
 import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
 import ThemeSelector from './ThemeSelector';
+import TabBar from './TabBar';
 
 interface MainLayoutProps {
   repos: GitHubRepo[];
@@ -19,7 +21,9 @@ interface MainLayoutProps {
   showCreateModal: boolean;
   isEditingReadme: boolean;
   viewMode: 'notes' | 'graph';
+  openTabs: string[];
   onSelectRepo: (repoName: string | null) => void;
+  onCloseTab: (repoName: string) => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
   onRefresh: () => void;
   onLogout: () => void;
@@ -42,7 +46,9 @@ function MainLayout({
   showCreateModal,
   isEditingReadme,
   viewMode,
+  openTabs,
   onSelectRepo,
+  onCloseTab,
   onRefresh,
   onLogout,
   onCreateRepo,
@@ -159,6 +165,12 @@ function MainLayout({
 
             {/* CENTER: Note Viewer/Editor */}
             <main className="note-main">
+              <TabBar
+                tabs={openTabs}
+                activeTab={selectedRepo?.name || null}
+                onSelectTab={(repoName) => onSelectRepo(repoName)}
+                onCloseTab={onCloseTab}
+              />
               {selectedRepo ? (
                 isEditingReadme ? (
                   <ReadmeEditor
@@ -201,7 +213,7 @@ function MainLayout({
                       <div
                         className="note-content"
                         onClick={handleReadmeClick}
-                        dangerouslySetInnerHTML={{ __html: renderWikiLinks(selectedReadme) }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedReadme) }}
                       />
                     ) : (
                       <div className="note-empty">

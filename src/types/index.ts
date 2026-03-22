@@ -72,6 +72,7 @@ export interface AppState {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
   selectedRepo: string | null;
+  openTabs: string[];
   filterOptions: FilterOptions;
   showCreateModal: boolean;
   isEditingReadme: boolean;
@@ -88,6 +89,8 @@ export type AppAction =
   | { type: 'ADD_REPO'; payload: GitHubRepo }
   | { type: 'SET_README_CONTENT'; payload: { repoName: string; content: string } }
   | { type: 'SET_SELECTED_REPO'; payload: string | null }
+  | { type: 'OPEN_TAB'; payload: string }
+  | { type: 'CLOSE_TAB'; payload: string }
   | { type: 'SET_FILTER_OPTIONS'; payload: Partial<FilterOptions> }
   | { type: 'SET_SHOW_CREATE_MODAL'; payload: boolean }
   | { type: 'SET_EDITING_README'; payload: boolean }

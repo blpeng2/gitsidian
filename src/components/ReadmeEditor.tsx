@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { renderWikiLinks } from '../utils/wikiLinks';
+import { renderMarkdown } from '../utils/markdown';
 
 interface ReadmeEditorProps {
   repoName: string;
@@ -106,7 +106,7 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
         {showPreview ? (
           <div
             className="editor-preview"
-            dangerouslySetInnerHTML={{ __html: renderWikiLinks(content) }}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
           />
         ) : (
           <textarea

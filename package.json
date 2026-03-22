@@ -11,7 +11,10 @@
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
+    "@types/katex": "^0.16.8",
     "cytoscape": "^3.33.1",
+    "katex": "^0.16.40",
+    "marked": "^17.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
