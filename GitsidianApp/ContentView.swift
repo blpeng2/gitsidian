@@ -4,6 +4,7 @@ struct ContentView: View {
     @Binding var showAIPanel: Bool
     @Binding var selectedProvider: String
     @Binding var devMode: Bool
+    @StateObject private var aiStore = AIPanelWebViewStore()
     
     var body: some View {
         HSplitView {
@@ -12,8 +13,11 @@ struct ContentView: View {
             
             if showAIPanel {
                 VStack(spacing: 0) {
-                    PromptBar(selectedProvider: $selectedProvider)
-                    AIPanelView(provider: AIProvider(rawValue: selectedProvider) ?? .chatgpt)
+                    PromptBar(selectedProvider: $selectedProvider, aiStore: aiStore)
+                    AIPanelView(
+                        provider: AIProvider(rawValue: selectedProvider) ?? .chatgpt,
+                        store: aiStore
+                    )
                 }
                 .frame(minWidth: 350, idealWidth: 450, maxWidth: 600)
             }

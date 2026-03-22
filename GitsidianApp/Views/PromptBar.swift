@@ -2,6 +2,11 @@ import SwiftUI
 
 struct PromptBar: View {
     @Binding var selectedProvider: String
+    @ObservedObject var aiStore: AIPanelWebViewStore
+
+    var currentProvider: AIProvider {
+        AIProvider(rawValue: selectedProvider) ?? .chatgpt
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -32,7 +37,7 @@ struct PromptBar: View {
                 HStack(spacing: 6) {
                     ForEach(PromptTemplate.presets) { template in
                         Button {
-                            copyPromptToClipboard(template)
+                            sendPrompt(template)
                         } label: {
                             Text("\(template.icon) \(template.title)")
                                 .font(.system(size: 11))
@@ -42,7 +47,7 @@ struct PromptBar: View {
                                 .cornerRadius(4)
                         }
                         .buttonStyle(.plain)
-                        .help("Copy prompt to clipboard: \(template.title)")
+                        .help(template.title)
                     }
                 }
                 .padding(.horizontal, 10)
@@ -53,12 +58,18 @@ struct PromptBar: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
     }
-    
-    private func copyPromptToClipboard(_ template: PromptTemplate) {
+
+    private func sendPrompt(_ template: PromptTemplate) {
+        let provider = currentProvider
+
+        if provider == .perplexity, let url = provider.urlWithPrompt(template.prompt) {
+            aiStore.navigateToURL(url)
+        } else {
+            aiStore.injectPrompt(template.prompt, provider: provider)
+        }
+
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(template.prompt, forType: .string)
-        
-        // Visual feedback could be added here
     }
 }
