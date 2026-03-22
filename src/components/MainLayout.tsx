@@ -205,8 +205,15 @@ function MainLayout({
                           <span className="language-badge">{selectedRepo.language}</span>
                         )}
                         {selectedRepo.topics.map((topic) => (
-                          <span key={topic} className="topic-tag">
+                          <span key={topic} className="topic-tag deletable">
                             {topic}
+                            <button
+                              className="topic-delete"
+                              onClick={() => void onUpdateTopics(selectedRepo.name, selectedRepo.topics.filter(t => t !== topic))}
+                              title="Remove topic"
+                            >
+                              ×
+                            </button>
                           </span>
                         ))}
                       </div>

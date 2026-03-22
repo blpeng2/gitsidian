@@ -1974,3 +1974,30 @@ body {
   color: white;
   pointer-events: none;
 }
+
+.topic-tag.deletable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding-right: 0.3rem;
+}
+
+.topic-delete {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.topic-tag.deletable:hover .topic-delete {
+  opacity: 1;
+}
+
+.topic-delete:hover {
+  color: var(--accent-danger);
+}
