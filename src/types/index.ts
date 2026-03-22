@@ -88,6 +88,7 @@ export type AppAction =
   | { type: 'SET_REPOS'; payload: GitHubRepo[] }
   | { type: 'ADD_REPO'; payload: GitHubRepo }
   | { type: 'SET_README_CONTENT'; payload: { repoName: string; content: string } }
+  | { type: 'UPDATE_REPO_TOPICS'; payload: { repoName: string; topics: string[] } }
   | { type: 'SET_SELECTED_REPO'; payload: string | null }
   | { type: 'OPEN_TAB'; payload: string }
   | { type: 'CLOSE_TAB'; payload: string }

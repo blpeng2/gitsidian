@@ -1833,3 +1833,106 @@ body {
 .editor-preview img { max-width: 100%; border-radius: 6px; }
 .editor-preview hr { border: none; border-top: 1px solid var(--border-color); margin: 1.5em 0; }
 .editor-preview .katex-display { margin: 1em 0; overflow-x: auto; }
+
+.toolbar-dropdown-container {
+  position: relative;
+}
+
+.toolbar-dropdown-container button.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.toolbar-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+  width: 220px;
+  overflow: hidden;
+}
+
+.toolbar-dropdown-search {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-primary);
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.toolbar-dropdown-search::placeholder {
+  color: var(--text-secondary);
+}
+
+.toolbar-dropdown-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.toolbar-dropdown-item {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0.4rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.toolbar-dropdown-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.topic-tags-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem;
+  min-height: 30px;
+}
+
+.topic-tag-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-tertiary);
+  color: var(--accent-secondary);
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.topic-tag-edit button {
+  width: auto;
+  height: auto;
+  display: inline;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 400;
+  padding: 0;
+  line-height: 1;
+}
+
+.topic-tag-edit button:hover {
+  color: var(--accent-danger);
+}
+
+.topic-input-row {
+  border-top: 1px solid var(--border-color);
+}

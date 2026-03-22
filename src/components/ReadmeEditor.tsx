@@ -1,19 +1,36 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { renderMarkdown } from '../utils/markdown';
 
 interface ReadmeEditorProps {
   repoName: string;
+  repoNames: string[];
   initialContent: string;
+  currentTopics: string[];
+  onUpdateTopics: (topics: string[]) => void;
   onSave: (content: string) => void;
   onCancel: () => void;
 }
 
-function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEditorProps) {
+function ReadmeEditor({
+  repoName,
+  repoNames,
+  initialContent,
+  currentTopics,
+  onUpdateTopics,
+  onSave,
+  onCancel,
+}: ReadmeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [showPreview, setShowPreview] = useState(false);
+  const [showWikiPicker, setShowWikiPicker] = useState(false);
+  const [wikiSearch, setWikiSearch] = useState('');
+  const [showTopicPicker, setShowTopicPicker] = useState(false);
+  const [topicInput, setTopicInput] = useState('');
   const historyRef = useRef<string[]>([initialContent]);
   const historyIndexRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wikiPickerRef = useRef<HTMLDivElement>(null);
+  const topicPickerRef = useRef<HTMLDivElement>(null);
 
   const updateContent = useCallback((newContent: string) => {
     const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -80,6 +97,34 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
   };
 
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
+
+  const insertWikiLink = useCallback((targetRepo: string) => {
+    insertMarkdown(`[[${stripPrefix(targetRepo)}]]`);
+    setShowWikiPicker(false);
+    setWikiSearch('');
+  }, [insertMarkdown]);
+
+  useEffect(() => {
+    if (!showWikiPicker && !showTopicPicker) return;
+
+    const handleOutsideClick = (event: globalThis.MouseEvent) => {
+      const target = event.target as Node;
+
+      if (showWikiPicker && wikiPickerRef.current && !wikiPickerRef.current.contains(target)) {
+        setShowWikiPicker(false);
+      }
+
+      if (showTopicPicker && topicPickerRef.current && !topicPickerRef.current.contains(target)) {
+        setShowTopicPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showWikiPicker, showTopicPicker]);
+
   const hasChanges = content !== initialContent;
 
   return (
@@ -128,7 +173,89 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
           <button title="Checkbox" onClick={() => insertMarkdown('- [ ] ')}>☐</button>
           <div className="toolbar-separator" />
           <button title="Link" onClick={() => insertMarkdown('[', '](url)')}>🔗</button>
-          <button title="Wiki-link" onClick={() => insertMarkdown('[[', ']]')}>⟦⟧</button>
+          <div className="toolbar-dropdown-container" ref={wikiPickerRef}>
+            <button
+              title="Wiki-link"
+              className={showWikiPicker ? 'active' : ''}
+              onClick={() => {
+                setShowWikiPicker(!showWikiPicker);
+                setShowTopicPicker(false);
+                setWikiSearch('');
+              }}
+            >
+              ⟦⟧
+            </button>
+            {showWikiPicker && (
+              <div className="toolbar-dropdown">
+                <input
+                  type="text"
+                  className="toolbar-dropdown-search"
+                  placeholder="Search notes..."
+                  value={wikiSearch}
+                  onChange={(e) => setWikiSearch(e.target.value)}
+                  autoFocus
+                />
+                <div className="toolbar-dropdown-list">
+                  {repoNames
+                    .filter((name) => name !== repoName)
+                    .filter((name) => stripPrefix(name).toLowerCase().includes(wikiSearch.toLowerCase()))
+                    .map((name) => (
+                      <button
+                        key={name}
+                        className="toolbar-dropdown-item"
+                        onClick={() => insertWikiLink(name)}
+                      >
+                        {stripPrefix(name)}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="toolbar-dropdown-container" ref={topicPickerRef}>
+            <button
+              title="Topics"
+              className={showTopicPicker ? 'active' : ''}
+              onClick={() => {
+                setShowTopicPicker(!showTopicPicker);
+                setShowWikiPicker(false);
+              }}
+            >
+              #
+            </button>
+            {showTopicPicker && (
+              <div className="toolbar-dropdown">
+                <div className="topic-tags-edit">
+                  {currentTopics.map((topic) => (
+                    <span key={topic} className="topic-tag-edit">
+                      {topic}
+                      <button onClick={() => onUpdateTopics(currentTopics.filter((t) => t !== topic))}>×</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="topic-input-row">
+                  <input
+                    type="text"
+                    className="toolbar-dropdown-search"
+                    placeholder="Add topic..."
+                    value={topicInput}
+                    onChange={(e) => setTopicInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && topicInput.trim()) {
+                        e.preventDefault();
+                        const newTopic = topicInput.trim();
+                        if (!currentTopics.includes(newTopic)) {
+                          onUpdateTopics([...currentTopics, newTopic]);
+                        }
+                        setTopicInput('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+          </div>
           <button title="Code" onClick={() => insertMarkdown('`', '`')}>{'<>'}</button>
           <button title="Code Block" onClick={() => insertMarkdown('```\n', '\n```')}>{'{ }'}</button>
           <div className="toolbar-separator" />
@@ -150,6 +277,10 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
             value={content}
             onChange={(e) => updateContent(e.target.value)}
             onKeyDown={handleKeyDown}
+            onFocus={() => {
+              setShowWikiPicker(false);
+              setShowTopicPicker(false);
+            }}
             placeholder="Write your note in Markdown...&#10;&#10;Use [[repo-name]] to link to other notes."
             spellCheck={false}
             autoFocus

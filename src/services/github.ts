@@ -195,6 +195,18 @@ class GitHubService {
     });
   }
 
+  async updateTopics(owner: string, repo: string, topics: string[]): Promise<void> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    await this.octokit.repos.replaceAllTopics({
+      owner,
+      repo,
+      names: topics,
+    });
+  }
+
   // Validate access token
   async validateToken(): Promise<boolean> {
     if (!this.octokit) {

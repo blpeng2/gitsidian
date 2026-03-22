@@ -29,6 +29,7 @@ interface MainLayoutProps {
   onLogout: () => void;
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
   onSaveReadme: (repoName: string, content: string) => Promise<void>;
+  onUpdateTopics: (repoName: string, topics: string[]) => Promise<void>;
   onShowCreateModal: (show: boolean) => void;
   onEditReadme: (editing: boolean) => void;
   onSetViewMode: (mode: 'notes' | 'graph') => void;
@@ -52,6 +53,7 @@ function MainLayout({
   onRefresh,
   onCreateRepo,
   onSaveReadme,
+  onUpdateTopics,
   onShowCreateModal,
   onEditReadme,
   onSetViewMode,
@@ -171,7 +173,10 @@ function MainLayout({
                 isEditingReadme ? (
                   <ReadmeEditor
                     repoName={selectedRepo.name}
+                    repoNames={repos.map((repo) => repo.name)}
                     initialContent={selectedReadme}
+                    currentTopics={selectedRepo.topics}
+                    onUpdateTopics={(topics: string[]) => void onUpdateTopics(selectedRepo.name, topics)}
                     onSave={(content: string) => void onSaveReadme(selectedRepo.name, content)}
                     onCancel={() => onEditReadme(false)}
                   />

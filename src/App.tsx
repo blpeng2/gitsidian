@@ -61,6 +61,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
           [action.payload.repoName]: action.payload.content,
         },
       };
+    case 'UPDATE_REPO_TOPICS':
+      return {
+        ...state,
+        repos: state.repos.map((repo) =>
+          repo.name === action.payload.repoName ? { ...repo, topics: action.payload.topics } : repo
+        ),
+      };
     case 'SET_SELECTED_REPO':
       if (action.payload === null) {
         return { ...state, selectedRepo: null };
@@ -297,6 +304,21 @@ function App() {
     }
   };
 
+  const handleUpdateTopics = async (repoName: string, topics: string[]) => {
+    try {
+      const repo = state.repos.find((r) => r.name === repoName);
+      if (!repo) return;
+
+      await githubService.updateTopics(repo.owner.login, repo.name, topics);
+      dispatch({ type: 'UPDATE_REPO_TOPICS', payload: { repoName, topics } });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to update topics',
+      });
+    }
+  };
+
   const graphData = generateGraphData(state.repos, state.readmeContents);
   const selectedRepoData = state.repos.find((repo) => repo.name === state.selectedRepo) || null;
 
@@ -324,6 +346,7 @@ function App() {
       onLogout={handleLogout}
       onCreateRepo={handleCreateRepo}
       onSaveReadme={handleSaveReadme}
+      onUpdateTopics={handleUpdateTopics}
       onShowCreateModal={(show: boolean) => dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show })}
       onEditReadme={(editing: boolean) => dispatch({ type: 'SET_EDITING_README', payload: editing })}
       viewMode={state.viewMode}
