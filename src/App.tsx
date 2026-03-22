@@ -280,28 +280,12 @@ function App() {
     }
   };
 
-  const handleSaveReadme = async (repoName: string, content: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
+  const handleReadmeSaved = (repoName: string, content: string) => {
+    dispatch({ type: 'SET_README_CONTENT', payload: { repoName, content } });
+  };
 
-    try {
-      const repo = state.repos.find((r) => r.name === repoName);
-      if (!repo) {
-        throw new Error('Repository not found');
-      }
-
-      const sha = await githubService.getReadmeSha(repo.owner.login, repo.name);
-      await githubService.updateReadme(repo.owner.login, repo.name, content, sha);
-      dispatch({ type: 'SET_README_CONTENT', payload: { repoName, content } });
-      dispatch({ type: 'SET_EDITING_README', payload: false });
-    } catch (error) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: error instanceof Error ? error.message : 'Failed to save README',
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
+  const handleCloseEditor = () => {
+    dispatch({ type: 'SET_EDITING_README', payload: false });
   };
 
   const handleUpdateTopics = async (repoName: string, topics: string[]) => {
@@ -345,10 +329,11 @@ function App() {
       onRefresh={fetchRepos}
       onLogout={handleLogout}
       onCreateRepo={handleCreateRepo}
-      onSaveReadme={handleSaveReadme}
+      onReadmeSaved={handleReadmeSaved}
       onUpdateTopics={handleUpdateTopics}
       onShowCreateModal={(show: boolean) => dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show })}
       onEditReadme={(editing: boolean) => dispatch({ type: 'SET_EDITING_README', payload: editing })}
+      onCloseEditor={handleCloseEditor}
       viewMode={state.viewMode}
       onSetViewMode={(mode: 'notes' | 'graph') => dispatch({ type: 'SET_VIEW_MODE', payload: mode })}
     />

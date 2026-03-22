@@ -503,7 +503,6 @@ body {
 }
 
 .legend-line.topic {
-  background: var(--text-secondary);
   background: repeating-linear-gradient(
     90deg,
     var(--text-secondary) 0,
@@ -2000,4 +1999,56 @@ body {
 
 .topic-delete:hover {
   color: var(--accent-danger);
+}
+
+.save-status {
+  font-size: 0.8rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.save-status-saved {
+  color: var(--accent-success);
+}
+
+.save-status-modified {
+  color: var(--accent-warning);
+}
+
+.save-status-saving {
+  color: var(--accent-primary);
+}
+
+.save-status-error {
+  color: var(--accent-danger);
+}
+
+.retry-save-btn {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  background: var(--accent-danger);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.retry-save-btn:hover {
+  opacity: 0.9;
+}
+
+.editor-close-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.editor-close-btn:hover {
+  background: var(--bg-tertiary);
 }

@@ -28,10 +28,11 @@ interface MainLayoutProps {
   onRefresh: () => void;
   onLogout: () => void;
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
-  onSaveReadme: (repoName: string, content: string) => Promise<void>;
+  onReadmeSaved: (repoName: string, content: string) => void;
   onUpdateTopics: (repoName: string, topics: string[]) => Promise<void>;
   onShowCreateModal: (show: boolean) => void;
   onEditReadme: (editing: boolean) => void;
+  onCloseEditor: () => void;
   onSetViewMode: (mode: 'notes' | 'graph') => void;
 }
 
@@ -52,10 +53,11 @@ function MainLayout({
   onCloseTab,
   onRefresh,
   onCreateRepo,
-  onSaveReadme,
+  onReadmeSaved,
   onUpdateTopics,
   onShowCreateModal,
   onEditReadme,
+  onCloseEditor,
   onSetViewMode,
 }: MainLayoutProps) {
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
@@ -178,8 +180,8 @@ function MainLayout({
                     initialContent={selectedReadme}
                     currentTopics={selectedRepo.topics}
                     onUpdateTopics={(topics: string[]) => void onUpdateTopics(selectedRepo.name, topics)}
-                    onSave={(content: string) => void onSaveReadme(selectedRepo.name, content)}
-                    onCancel={() => onEditReadme(false)}
+                    onSave={(content: string) => onReadmeSaved(selectedRepo.name, content)}
+                    onClose={onCloseEditor}
                   />
                 ) : (
                   <div className="note-viewer">

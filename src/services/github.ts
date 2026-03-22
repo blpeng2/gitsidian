@@ -177,7 +177,7 @@ class GitHubService {
     }
   }
 
-  async updateReadme(owner: string, repo: string, content: string, sha: string | null): Promise<void> {
+  async updateReadme(owner: string, repo: string, content: string, sha: string | null): Promise<string> {
     if (!this.octokit) {
       throw new Error('Not authenticated');
     }
@@ -185,7 +185,7 @@ class GitHubService {
     const bytes = new TextEncoder().encode(content);
     const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
     const encoded = btoa(binary);
-    await this.octokit.repos.createOrUpdateFileContents({
+    const { data } = await this.octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
       path: 'README.md',
@@ -193,6 +193,8 @@ class GitHubService {
       content: encoded,
       ...(sha && { sha }),
     });
+
+    return data.content?.sha || '';
   }
 
   async uploadImage(owner: string, repo: string, filename: string, base64Content: string): Promise<string> {

@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { renderMarkdown } from '../utils/markdown';
 import { githubService } from '../services/github';
+import { storageService } from '../services/storage';
+
+type SaveStatus = 'saved' | 'modified' | 'saving' | 'error';
 
 interface ReadmeEditorProps {
   repoName: string;
@@ -10,7 +13,7 @@ interface ReadmeEditorProps {
   currentTopics: string[];
   onUpdateTopics: (topics: string[]) => void;
   onSave: (content: string) => void;
-  onCancel: () => void;
+  onClose: () => void;
 }
 
 function ReadmeEditor({
@@ -21,20 +24,80 @@ function ReadmeEditor({
   currentTopics,
   onUpdateTopics,
   onSave,
-  onCancel,
+  onClose,
 }: ReadmeEditorProps) {
   const [content, setContent] = useState(initialContent);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showWikiPicker, setShowWikiPicker] = useState(false);
   const [wikiSearch, setWikiSearch] = useState('');
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [topicInput, setTopicInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shaRef = useRef<string | null>(null);
+  const contentRef = useRef(initialContent);
+  const lastSavedContentRef = useRef(initialContent);
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef(false);
   const historyRef = useRef<string[]>([initialContent]);
   const historyIndexRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wikiPickerRef = useRef<HTMLDivElement>(null);
   const topicPickerRef = useRef<HTMLDivElement>(null);
+
+  const saveToGitHub = useCallback(async () => {
+    const contentToSave = contentRef.current;
+    if (contentToSave === lastSavedContentRef.current) {
+      setSaveStatus('saved');
+      return;
+    }
+    if (isSavingRef.current) {
+      pendingSaveRef.current = true;
+      return;
+    }
+
+    isSavingRef.current = true;
+    setSaveStatus('saving');
+    setErrorMsg(null);
+
+    try {
+      const newSha = await githubService.updateReadme(repoOwner, repoName, contentToSave, shaRef.current);
+      shaRef.current = newSha;
+      lastSavedContentRef.current = contentToSave;
+      onSave(contentToSave);
+      storageService.removeDraft(repoName);
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveStatus('error');
+      const message = error instanceof Error ? error.message : 'Save failed';
+      setErrorMsg(message);
+      if (message.includes('409')) {
+        try {
+          const freshSha = await githubService.getReadmeSha(repoOwner, repoName);
+          shaRef.current = freshSha;
+        } catch (shaError) {
+          console.error('Failed to refresh README SHA:', shaError);
+        }
+      }
+    } finally {
+      isSavingRef.current = false;
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current = false;
+        void saveToGitHub();
+      }
+    }
+  }, [repoOwner, repoName, onSave]);
+
+  const queueDebouncedSave = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      void saveToGitHub();
+    }, 3000);
+  }, [saveToGitHub]);
 
   const updateContent = useCallback((newContent: string) => {
     const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
@@ -43,21 +106,38 @@ function ReadmeEditor({
     historyRef.current = newHistory;
     historyIndexRef.current = newHistory.length - 1;
     setContent(newContent);
-  }, []);
+    contentRef.current = newContent;
+    setSaveStatus('modified');
+    setErrorMsg(null);
+    storageService.setDraft(repoName, newContent);
+    queueDebouncedSave();
+  }, [repoName, queueDebouncedSave]);
 
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current--;
-      setContent(historyRef.current[historyIndexRef.current]);
+      const nextContent = historyRef.current[historyIndexRef.current];
+      setContent(nextContent);
+      contentRef.current = nextContent;
+      setSaveStatus('modified');
+      setErrorMsg(null);
+      storageService.setDraft(repoName, nextContent);
+      queueDebouncedSave();
     }
-  }, []);
+  }, [repoName, queueDebouncedSave]);
 
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current++;
-      setContent(historyRef.current[historyIndexRef.current]);
+      const nextContent = historyRef.current[historyIndexRef.current];
+      setContent(nextContent);
+      contentRef.current = nextContent;
+      setSaveStatus('modified');
+      setErrorMsg(null);
+      storageService.setDraft(repoName, nextContent);
+      queueDebouncedSave();
     }
-  }, []);
+  }, [repoName, queueDebouncedSave]);
 
   const insertMarkdown = useCallback((before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -132,7 +212,10 @@ function ReadmeEditor({
     }
     if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      onSave(content);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      void saveToGitHub();
     }
     // Tab inserts 2 spaces
     if (e.key === 'Tab') {
@@ -148,6 +231,23 @@ function ReadmeEditor({
     setShowWikiPicker(false);
     setWikiSearch('');
   }, [insertMarkdown]);
+
+  useEffect(() => {
+    githubService.getReadmeSha(repoOwner, repoName).then((sha) => {
+      shaRef.current = sha;
+    }).catch(() => undefined);
+  }, [repoOwner, repoName]);
+
+  useEffect(() => {
+    const draft = storageService.getDraft(repoName);
+    if (draft && draft !== initialContent) {
+      setContent(draft);
+      contentRef.current = draft;
+      setSaveStatus('modified');
+      historyRef.current = [draft];
+      historyIndexRef.current = 0;
+    }
+  }, []);
 
   useEffect(() => {
     if (!showWikiPicker && !showTopicPicker) return;
@@ -170,7 +270,39 @@ function ReadmeEditor({
     };
   }, [showWikiPicker, showTopicPicker]);
 
-  const hasChanges = content !== initialContent;
+  useEffect(() => {
+    const handleBlur = () => {
+      if (contentRef.current !== lastSavedContentRef.current) {
+        void saveToGitHub();
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden && contentRef.current !== lastSavedContentRef.current) {
+        void saveToGitHub();
+      }
+    };
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (contentRef.current !== lastSavedContentRef.current) {
+        event.preventDefault();
+        void saveToGitHub();
+      }
+    };
+
+    window.addEventListener('blur', handleBlur);
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [saveToGitHub]);
 
   return (
     <div className="editor-fullscreen">
@@ -178,7 +310,6 @@ function ReadmeEditor({
         <div className="editor-title">
           <span className="editor-icon">📝</span>
           <h2>{stripPrefix(repoName)}</h2>
-          {hasChanges && <span className="editor-unsaved">● Unsaved</span>}
         </div>
         <div className="editor-header-actions">
           <button
@@ -194,11 +325,27 @@ function ReadmeEditor({
             👁 Preview
           </button>
           <div className="editor-header-separator" />
-          <button onClick={onCancel} className="editor-cancel-btn">
-            Cancel
-          </button>
-          <button onClick={() => onSave(content)} className="editor-save-btn" disabled={!hasChanges}>
-            💾 Save
+          <span className={`save-status save-status-${saveStatus}`}>
+            {saveStatus === 'saved' && '✓ Saved'}
+            {saveStatus === 'modified' && '● Modified'}
+            {saveStatus === 'saving' && '⏳ Saving...'}
+            {saveStatus === 'error' && `✗ ${errorMsg || 'Error'}`}
+          </span>
+          {saveStatus === 'error' && (
+            <button onClick={() => void saveToGitHub()} className="retry-save-btn">
+              Retry
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (contentRef.current !== lastSavedContentRef.current) {
+                void saveToGitHub();
+              }
+              onClose();
+            }}
+            className="editor-close-btn"
+          >
+            ✕ Close
           </button>
         </div>
       </div>
@@ -382,9 +529,9 @@ function ReadmeEditor({
       <div className="editor-footer">
         <span className="editor-stats">
           {content.length} chars · {content.split('\n').length} lines
-          {hasChanges && ' · Modified'}
+          {saveStatus === 'modified' && ' · Modified'}
         </span>
-        <span className="editor-shortcut-hint">Ctrl+S to save · Tab to indent</span>
+        <span className="editor-shortcut-hint">Auto-saves after 3s · Ctrl+S to save now</span>
       </div>
     </div>
   );
