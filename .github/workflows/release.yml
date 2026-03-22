@@ -45,36 +45,19 @@ jobs:
           VITE_OAUTH_CLIENT_ID: ${{ secrets.VITE_OAUTH_CLIENT_ID }}
         run: VITE_BASE_PATH=/ npm run build -- --outDir GitsidianApp/Resources/web
       
-      - name: Build Swift (arm64)
+      - name: Build and bundle (arm64)
         run: |
           cd GitsidianApp
           swift build -c release --triple arm64-apple-macosx
-      
-      - name: Build Swift (x86_64)
-        run: |
-          cd GitsidianApp
-          swift build -c release --triple x86_64-apple-macosx
-      
-      - name: Create universal binary and .app bundle
-        run: |
-          cd GitsidianApp
-          APP_NAME="Gitsidian"
-          BUNDLE_DIR="${APP_NAME}.app"
           
+          BUNDLE_DIR="Gitsidian.app"
           rm -rf "$BUNDLE_DIR"
           mkdir -p "$BUNDLE_DIR/Contents/MacOS"
           mkdir -p "$BUNDLE_DIR/Contents/Resources"
           
-          # Create universal binary (arm64 + x86_64)
-          lipo -create \
-            ".build/arm64-apple-macosx/release/GitsidianApp" \
-            ".build/x86_64-apple-macosx/release/GitsidianApp" \
-            -output "$BUNDLE_DIR/Contents/MacOS/GitsidianApp"
-          
-          # Copy web resources
+          cp ".build/arm64-apple-macosx/release/GitsidianApp" "$BUNDLE_DIR/Contents/MacOS/GitsidianApp"
           cp -R "Resources/web" "$BUNDLE_DIR/Contents/Resources/web"
           
-          # Create complete Info.plist
           python3 -c "
           import plistlib
           with open('Info.plist', 'rb') as f:
@@ -86,29 +69,53 @@ jobs:
           plist['NSMainNibFile'] = ''
           with open('$BUNDLE_DIR/Contents/Info.plist', 'wb') as f:
               plistlib.dump(plist, f)
-          " 2>&1 || {
-            # Fallback: copy Info.plist as-is if python fails
-            cp Info.plist "$BUNDLE_DIR/Contents/Info.plist"
-          }
+          "
           
-          # PkgInfo
           echo -n "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
-          
-          # Ad-hoc code sign
           codesign --force --sign - --options runtime "$BUNDLE_DIR"
           
-          echo "✅ Created $BUNDLE_DIR"
+          ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-arm64.zip
+          rm -rf "$BUNDLE_DIR"
       
-      - name: Create ZIP
+      - name: Build and bundle (x86_64)
         run: |
           cd GitsidianApp
-          ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-universal.zip
+          swift build -c release --triple x86_64-apple-macosx
+          
+          BUNDLE_DIR="Gitsidian.app"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR/Contents/MacOS"
+          mkdir -p "$BUNDLE_DIR/Contents/Resources"
+          
+          cp ".build/x86_64-apple-macosx/release/GitsidianApp" "$BUNDLE_DIR/Contents/MacOS/GitsidianApp"
+          cp -R "Resources/web" "$BUNDLE_DIR/Contents/Resources/web"
+          
+          python3 -c "
+          import plistlib
+          with open('Info.plist', 'rb') as f:
+              plist = plistlib.load(f)
+          plist['CFBundleExecutable'] = 'GitsidianApp'
+          plist['CFBundlePackageType'] = 'APPL'
+          plist['CFBundleShortVersionString'] = '${{ steps.version.outputs.VERSION }}'
+          plist['NSHighResolutionCapable'] = True
+          plist['NSMainNibFile'] = ''
+          with open('$BUNDLE_DIR/Contents/Info.plist', 'wb') as f:
+              plistlib.dump(plist, f)
+          "
+          
+          echo -n "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
+          codesign --force --sign - --options runtime "$BUNDLE_DIR"
+          
+          ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-x86_64.zip
+          rm -rf "$BUNDLE_DIR"
       
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Gitsidian-macOS
-          path: GitsidianApp/Gitsidian-macOS-universal.zip
+          path: |
+            GitsidianApp/Gitsidian-macOS-arm64.zip
+            GitsidianApp/Gitsidian-macOS-x86_64.zip
           retention-days: 30
       
       - name: Create GitHub Release
@@ -121,12 +128,17 @@ jobs:
             ## Gitsidian macOS App v${{ steps.version.outputs.VERSION }}
             
             ### Download
-            Download `Gitsidian-macOS-universal.zip`, extract, and drag `Gitsidian.app` to your Applications folder.
+            | File | Architecture |
+            |------|-------------|
+            | `Gitsidian-macOS-arm64.zip` | Apple Silicon (M1/M2/M3/M4) |
+            | `Gitsidian-macOS-x86_64.zip` | Intel Mac |
+            
+            Extract the ZIP and drag `Gitsidian.app` to your Applications folder.
             
             **Requirements:** macOS 14 (Sonoma) or later
-            **Architecture:** Universal (Apple Silicon + Intel)
             
             > ⚠️ First launch: Right-click → Open (bypasses Gatekeeper for unsigned apps)
           files: |
-            GitsidianApp/Gitsidian-macOS-universal.zip
+            GitsidianApp/Gitsidian-macOS-arm64.zip
+            GitsidianApp/Gitsidian-macOS-x86_64.zip
           generate_release_notes: true
