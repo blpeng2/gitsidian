@@ -33,10 +33,16 @@ struct MainWebView: NSViewRepresentable {
                 webView.load(URLRequest(url: url))
             }
         } else {
-            // Production: load bundled web app
-            if let resourceURL = Bundle.main.resourceURL?.appendingPathComponent("web"),
-               let indexURL = resourceURL.appendingPathComponent("index.html") as URL? {
-                webView.loadFileURL(indexURL, allowingReadAccessTo: resourceURL)
+            let webURL: URL? =
+                Bundle.module.url(forResource: "web", withExtension: nil, subdirectory: "Resources")
+                ?? Bundle.main.resourceURL?.appendingPathComponent("web")
+            
+            if let resourceURL = webURL,
+               FileManager.default.fileExists(atPath: resourceURL.appendingPathComponent("index.html").path) {
+                webView.loadFileURL(
+                    resourceURL.appendingPathComponent("index.html"),
+                    allowingReadAccessTo: resourceURL
+                )
             }
         }
     }
