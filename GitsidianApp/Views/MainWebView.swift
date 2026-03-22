@@ -196,23 +196,29 @@ struct MainWebView: NSViewRepresentable {
         }
         
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = navigationAction.request.url {
-                if url.host == "github.com" && url.path.contains("/login/oauth/authorize") {
-                    NSWorkspace.shared.open(url)
-                    decisionHandler(.cancel)
-                    return
-                }
-
-                if navigationAction.navigationType == .linkActivated,
-                   url.host != nil,
-                   !url.isFileURL {
-                    if url.host != "localhost" && url.host != "127.0.0.1" {
-                        NSWorkspace.shared.open(url)
-                        decisionHandler(.cancel)
-                        return
-                    }
-                }
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.allow)
+                return
             }
+            
+            // GitHub OAuth — open in system browser
+            if url.host == "github.com" && url.path.contains("/login/oauth/authorize") {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            
+            // External links — open in default browser (original b5036aa logic)
+            if navigationAction.navigationType == .linkActivated,
+               url.host != nil,
+               !url.isFileURL,
+               url.host != "localhost",
+               url.host != "127.0.0.1" {
+                NSWorkspace.shared.open(url)
+                decisionHandler(.cancel)
+                return
+            }
+            
             decisionHandler(.allow)
         }
 
