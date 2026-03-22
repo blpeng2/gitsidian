@@ -19,6 +19,8 @@ const initialState: AppState = {
     showOrphans: true,
     topicFilter: null,
   },
+  showCreateModal: false,
+  isEditingReadme: false,
   isLoading: false,
   isLoadingReadmes: false,
   error: null,
@@ -41,6 +43,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ? state.selectedRepo
           : null,
       };
+    case 'ADD_REPO':
+      return {
+        ...state,
+        repos: [...state.repos, action.payload],
+      };
     case 'SET_README_CONTENT':
       return {
         ...state,
@@ -61,6 +68,16 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ...state.filterOptions,
           ...action.payload,
         },
+      };
+    case 'SET_SHOW_CREATE_MODAL':
+      return {
+        ...state,
+        showCreateModal: action.payload,
+      };
+    case 'SET_EDITING_README':
+      return {
+        ...state,
+        isEditingReadme: action.payload,
       };
     case 'SET_LOADING':
       return {
@@ -200,6 +217,49 @@ function App() {
     dispatch({ type: 'SET_FILTER_OPTIONS', payload: options });
   };
 
+  const handleCreateRepo = async (name: string, description: string, isPrivate: boolean) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      const newRepo = await githubService.createRepo(name, description, isPrivate);
+      dispatch({ type: 'ADD_REPO', payload: newRepo });
+      dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: false });
+      dispatch({ type: 'SET_SELECTED_REPO', payload: newRepo.name });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to create repository',
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
+  const handleSaveReadme = async (repoName: string, content: string) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      const repo = state.repos.find((r) => r.name === repoName);
+      if (!repo) {
+        throw new Error('Repository not found');
+      }
+
+      const sha = await githubService.getReadmeSha(repo.owner.login, repo.name);
+      await githubService.updateReadme(repo.owner.login, repo.name, content, sha);
+      dispatch({ type: 'SET_README_CONTENT', payload: { repoName, content } });
+      dispatch({ type: 'SET_EDITING_README', payload: false });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to save README',
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
   const graphData = generateGraphData(state.repos, state.readmeContents);
   const selectedRepoData = state.repos.find((repo) => repo.name === state.selectedRepo) || null;
 
@@ -217,10 +277,16 @@ function App() {
       isLoading={state.isLoading}
       isLoadingReadmes={state.isLoadingReadmes}
       error={state.error}
+      showCreateModal={state.showCreateModal}
+      isEditingReadme={state.isEditingReadme}
       onSelectRepo={handleSelectRepo}
       onUpdateFilters={handleUpdateFilters}
       onRefresh={fetchRepos}
       onLogout={handleLogout}
+      onCreateRepo={handleCreateRepo}
+      onSaveReadme={handleSaveReadme}
+      onShowCreateModal={(show: boolean) => dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show })}
+      onEditReadme={(editing: boolean) => dispatch({ type: 'SET_EDITING_README', payload: editing })}
     />
   );
 }

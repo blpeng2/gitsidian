@@ -73,6 +73,8 @@ export interface AppState {
   readmeContents: Record<string, string>;
   selectedRepo: string | null;
   filterOptions: FilterOptions;
+  showCreateModal: boolean;
+  isEditingReadme: boolean;
   isLoading: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
@@ -82,9 +84,12 @@ export interface AppState {
 export type AppAction =
   | { type: 'SET_AUTHENTICATED'; payload: { isAuthenticated: boolean; accessToken: string | null } }
   | { type: 'SET_REPOS'; payload: GitHubRepo[] }
+  | { type: 'ADD_REPO'; payload: GitHubRepo }
   | { type: 'SET_README_CONTENT'; payload: { repoName: string; content: string } }
   | { type: 'SET_SELECTED_REPO'; payload: string | null }
   | { type: 'SET_FILTER_OPTIONS'; payload: Partial<FilterOptions> }
+  | { type: 'SET_SHOW_CREATE_MODAL'; payload: boolean }
+  | { type: 'SET_EDITING_README'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_READMES'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null };

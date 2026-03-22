@@ -2,6 +2,7 @@ import { Octokit } from '@octokit/rest';
 import { GitHubRepo } from '../types';
 
 const OAUTH_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || '';
+const REPO_PREFIX = 'gitsidian-';
 
 class GitHubService {
   private octokit: Octokit | null = null;
@@ -84,7 +85,7 @@ class GitHubService {
         page++;
       }
 
-      return repos;
+      return repos.filter((repo) => repo.name.startsWith(REPO_PREFIX));
     } catch (error) {
       console.error('Error fetching repos:', error);
       throw error;
@@ -130,6 +131,70 @@ class GitHubService {
     return results;
   }
 
+  async createRepo(name: string, description: string, isPrivate: boolean): Promise<GitHubRepo> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    const fullName = `${REPO_PREFIX}${name}`;
+    const { data: repo } = await this.octokit.repos.createForAuthenticatedUser({
+      name: fullName,
+      description,
+      private: isPrivate,
+      auto_init: true,
+    });
+
+    return {
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      description: repo.description,
+      private: repo.private,
+      html_url: repo.html_url,
+      topics: repo.topics || [],
+      updated_at: repo.updated_at || new Date().toISOString(),
+      created_at: repo.created_at || new Date().toISOString(),
+      language: repo.language,
+      stargazers_count: repo.stargazers_count || 0,
+      forks_count: repo.forks_count || 0,
+      owner: {
+        login: repo.owner.login,
+        avatar_url: repo.owner.avatar_url,
+      },
+    };
+  }
+
+  async getReadmeSha(owner: string, repo: string): Promise<string | null> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    try {
+      const { data } = await this.octokit.repos.getReadme({ owner, repo });
+      return data.sha;
+    } catch {
+      return null;
+    }
+  }
+
+  async updateReadme(owner: string, repo: string, content: string, sha: string | null): Promise<void> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    const bytes = new TextEncoder().encode(content);
+    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+    const encoded = btoa(binary);
+    await this.octokit.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: 'README.md',
+      message: 'Update README via Gitsidian',
+      content: encoded,
+      ...(sha && { sha }),
+    });
+  }
+
   // Validate access token
   async validateToken(): Promise<boolean> {
     if (!this.octokit) {
@@ -161,3 +226,4 @@ class GitHubService {
 
 // Export singleton instance
 export const githubService = new GitHubService();
+export { REPO_PREFIX };

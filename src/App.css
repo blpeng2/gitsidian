@@ -697,6 +697,12 @@ body {
   text-decoration: underline;
 }
 
+.readme-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .readme-meta {
   display: flex;
   gap: 0.75rem;
@@ -873,4 +879,195 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
+}
+
+.create-btn {
+  padding: 0.5rem 1rem;
+  background: var(--accent-success);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.create-btn:hover {
+  opacity: 0.9;
+}
+
+.edit-readme-btn {
+  padding: 0.25rem 0.75rem;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.edit-readme-btn:hover {
+  background: var(--accent-primary);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--bg-secondary);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: var(--shadow);
+}
+
+.modal-content h2 {
+  margin-bottom: 1.5rem;
+  color: var(--accent-primary);
+}
+
+.modal-content .form-group {
+  margin-bottom: 1rem;
+}
+
+.modal-content label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.modal-content input[type="text"] {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.repo-name-input {
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.repo-prefix {
+  padding: 0.6rem 0.4rem 0.6rem 0.8rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.repo-name-input input {
+  border: none !important;
+  background: transparent !important;
+  padding-left: 0 !important;
+  flex: 1;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions .cancel-btn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.modal-actions .submit-btn {
+  padding: 0.5rem 1.25rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.modal-actions .submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.readme-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.readme-textarea {
+  width: 100%;
+  min-height: 300px;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.readme-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.editor-actions .cancel-btn {
+  padding: 0.4rem 1rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.editor-actions .save-btn {
+  padding: 0.4rem 1rem;
+  background: var(--accent-success);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
 }

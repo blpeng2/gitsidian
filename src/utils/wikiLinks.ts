@@ -45,6 +45,13 @@ function findRepoName(repoNames: Set<string>, target: string): string | null {
   for (const name of repoNames) {
     if (name.toLowerCase() === lower) return name;
   }
+
+  const prefixed = `gitsidian-${target}`;
+  const prefixedLower = prefixed.toLowerCase();
+  for (const name of repoNames) {
+    if (name.toLowerCase() === prefixedLower) return name;
+  }
+
   return null;
 }
 
@@ -65,7 +72,7 @@ export function generateGraphData(
     nodes.push({
       data: {
         id: repo.name,
-        label: repo.name,
+        label: repo.name.replace(/^gitsidian-/, ''),
         description: repo.description,
         isPrivate: repo.private,
         topics: repo.topics,

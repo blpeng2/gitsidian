@@ -4,6 +4,8 @@ import GraphView from './GraphView';
 import RepoList from './RepoList';
 import FilterPanel from './FilterPanel';
 import { getBacklinks, getOutlinks, renderWikiLinks } from '../utils/wikiLinks';
+import ReadmeEditor from './ReadmeEditor';
+import CreateRepoModal from './CreateRepoModal';
 
 interface MainLayoutProps {
   repos: GitHubRepo[];
@@ -14,10 +16,16 @@ interface MainLayoutProps {
   isLoading: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
+  showCreateModal: boolean;
+  isEditingReadme: boolean;
   onSelectRepo: (repoName: string | null) => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
   onRefresh: () => void;
   onLogout: () => void;
+  onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
+  onSaveReadme: (repoName: string, content: string) => Promise<void>;
+  onShowCreateModal: (show: boolean) => void;
+  onEditReadme: (editing: boolean) => void;
 }
 
 function MainLayout({
@@ -29,12 +37,19 @@ function MainLayout({
   isLoading,
   isLoadingReadmes,
   error,
+  showCreateModal,
+  isEditingReadme,
   onSelectRepo,
   onUpdateFilters,
   onRefresh,
   onLogout,
+  onCreateRepo,
+  onSaveReadme,
+  onShowCreateModal,
+  onEditReadme,
 }: MainLayoutProps) {
   const [showSidebar, setShowSidebar] = useState(true);
+  const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
 
   const filteredRepos = useMemo(
     () =>
@@ -75,7 +90,12 @@ function MainLayout({
     if (!target.classList.contains('wikilink')) return;
     const repoName = target.getAttribute('data-repo')?.trim();
     if (!repoName) return;
-    const resolvedRepo = repos.find((repo) => repo.name.toLowerCase() === repoName.toLowerCase());
+    const normalized = repoName.toLowerCase();
+    const prefixed = `gitsidian-${repoName}`.toLowerCase();
+    const resolvedRepo = repos.find((repo) => {
+      const lowerName = repo.name.toLowerCase();
+      return lowerName === normalized || lowerName === prefixed;
+    });
     if (!resolvedRepo) return;
     onSelectRepo(resolvedRepo.name);
   };
@@ -90,6 +110,9 @@ function MainLayout({
           </span>
         </div>
         <div className="header-right">
+          <button onClick={() => onShowCreateModal(true)} className="create-btn">
+            ✚ New Note
+          </button>
           <button onClick={onRefresh} className="refresh-btn" disabled={isLoading}>
             {isLoading ? 'Loading...' : '↻ Refresh'}
           </button>
@@ -134,15 +157,20 @@ function MainLayout({
             {selectedRepo && (
               <div className="readme-viewer">
                 <div className="readme-viewer-header">
-                  <h3>{selectedRepo.name}</h3>
-                  <a
-                    className="github-link"
-                    href={selectedRepo.html_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    View on GitHub
-                  </a>
+                  <h3>{stripPrefix(selectedRepo.name)}</h3>
+                  <div className="readme-viewer-actions">
+                    <a
+                      className="github-link"
+                      href={selectedRepo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View on GitHub
+                    </a>
+                    <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
+                      ✎ Edit
+                    </button>
+                  </div>
                 </div>
 
                 <div className="readme-meta">
@@ -154,7 +182,13 @@ function MainLayout({
                   ))}
                 </div>
 
-                {selectedReadme ? (
+                {isEditingReadme && selectedRepo ? (
+                  <ReadmeEditor
+                    initialContent={selectedReadme}
+                    onSave={(content) => void onSaveReadme(selectedRepo.name, content)}
+                    onCancel={() => onEditReadme(false)}
+                  />
+                ) : selectedReadme ? (
                   <div
                     className="readme-content"
                     onClick={handleReadmeClick}
@@ -174,7 +208,7 @@ function MainLayout({
                           className="link-item"
                           onClick={() => onSelectRepo(backlink.source)}
                         >
-                          <span>{backlink.source}</span>
+                          <span>{stripPrefix(backlink.source)}</span>
                           {backlink.alias && <span>as {backlink.alias}</span>}
                         </div>
                       ))}
@@ -194,7 +228,7 @@ function MainLayout({
                           className="link-item"
                           onClick={() => onSelectRepo(outlink.target)}
                         >
-                          <span>{outlink.target}</span>
+                          <span>{stripPrefix(outlink.target)}</span>
                           {outlink.alias && <span>as {outlink.alias}</span>}
                         </div>
                       ))}
@@ -208,6 +242,14 @@ function MainLayout({
           </aside>
         )}
       </div>
+
+      {showCreateModal && (
+        <CreateRepoModal
+          onSubmit={onCreateRepo}
+          onClose={() => onShowCreateModal(false)}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 }
