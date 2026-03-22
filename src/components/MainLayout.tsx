@@ -173,6 +173,7 @@ function MainLayout({
                 isEditingReadme ? (
                   <ReadmeEditor
                     repoName={selectedRepo.name}
+                    repoOwner={selectedRepo.owner.login}
                     repoNames={repos.map((repo) => repo.name)}
                     initialContent={selectedReadme}
                     currentTopics={selectedRepo.topics}

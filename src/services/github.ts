@@ -195,6 +195,43 @@ class GitHubService {
     });
   }
 
+  async uploadImage(owner: string, repo: string, filename: string, base64Content: string): Promise<string> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    let sha: string | undefined;
+    try {
+      const { data } = await this.octokit.repos.getContent({
+        owner,
+        repo,
+        path: `assets/${filename}`,
+      });
+
+      if (!Array.isArray(data) && 'sha' in data) {
+        sha = data.sha;
+      }
+    } catch (error) {
+      const status = typeof error === 'object' && error !== null && 'status' in error
+        ? (error as { status?: number }).status
+        : undefined;
+      if (status !== 404) {
+        throw error;
+      }
+    }
+
+    await this.octokit.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path: `assets/${filename}`,
+      message: `Upload image: ${filename}`,
+      content: base64Content,
+      ...(sha && { sha }),
+    });
+
+    return `https://raw.githubusercontent.com/${owner}/${repo}/main/assets/${filename}`;
+  }
+
   async updateTopics(owner: string, repo: string, topics: string[]): Promise<void> {
     if (!this.octokit) {
       throw new Error('Not authenticated');

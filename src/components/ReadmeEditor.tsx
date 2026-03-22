@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { renderMarkdown } from '../utils/markdown';
+import { githubService } from '../services/github';
 
 interface ReadmeEditorProps {
   repoName: string;
   repoNames: string[];
+  repoOwner: string;
   initialContent: string;
   currentTopics: string[];
   onUpdateTopics: (topics: string[]) => void;
@@ -14,6 +16,7 @@ interface ReadmeEditorProps {
 function ReadmeEditor({
   repoName,
   repoNames,
+  repoOwner,
   initialContent,
   currentTopics,
   onUpdateTopics,
@@ -26,6 +29,7 @@ function ReadmeEditor({
   const [wikiSearch, setWikiSearch] = useState('');
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [topicInput, setTopicInput] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const historyRef = useRef<string[]>([initialContent]);
   const historyIndexRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -73,6 +77,47 @@ function ReadmeEditor({
       );
     }, 0);
   }, [content, updateContent]);
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const timestamp = Date.now();
+      const originalName = file.name || 'image.png';
+      const safeName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filename = `${timestamp}-${safeName}`;
+
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result !== 'string') {
+            reject(new Error('Failed to read image as base64'));
+            return;
+          }
+
+          const [, contentPart] = reader.result.split(',');
+          if (!contentPart) {
+            reject(new Error('Invalid image payload'));
+            return;
+          }
+
+          resolve(contentPart);
+        };
+        reader.onerror = () => reject(reader.error ?? new Error('Failed to read image'));
+        reader.readAsDataURL(file);
+      });
+
+      const imageUrl = await githubService.uploadImage(repoOwner, repoName, filename, base64);
+      insertMarkdown(`![${originalName}](${imageUrl})`);
+    } catch (error) {
+      console.error('Image upload failed:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [repoOwner, repoName, insertMarkdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
@@ -259,12 +304,33 @@ function ReadmeEditor({
           <button title="Code" onClick={() => insertMarkdown('`', '`')}>{'<>'}</button>
           <button title="Code Block" onClick={() => insertMarkdown('```\n', '\n```')}>{'{ }'}</button>
           <div className="toolbar-separator" />
+          <label className="toolbar-upload-btn" title="Upload Image">
+            📎
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void handleImageUpload(file);
+                }
+                e.target.value = '';
+              }}
+            />
+          </label>
+          <div className="toolbar-separator" />
           <button title="Quote" onClick={() => insertMarkdown('> ')}>❝</button>
           <button title="Horizontal Rule" onClick={() => insertMarkdown('\n---\n')}>—</button>
         </div>
       )}
 
       <div className="editor-body">
+        {isUploading && (
+          <div className="upload-overlay">
+            <span>📤 Uploading image...</span>
+          </div>
+        )}
         {showPreview ? (
           <div
             className="editor-preview"
@@ -277,6 +343,31 @@ function ReadmeEditor({
             value={content}
             onChange={(e) => updateContent(e.target.value)}
             onKeyDown={handleKeyDown}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const file = e.dataTransfer.files[0];
+              if (file && file.type.startsWith('image/')) {
+                void handleImageUpload(file);
+              }
+            }}
+            onPaste={(e) => {
+              const items = e.clipboardData.items;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.startsWith('image/')) {
+                  e.preventDefault();
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    void handleImageUpload(file);
+                  }
+                  return;
+                }
+              }
+            }}
             onFocus={() => {
               setShowWikiPicker(false);
               setShowTopicPicker(false);
