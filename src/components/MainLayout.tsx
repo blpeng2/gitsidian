@@ -1,12 +1,12 @@
-import { useMemo, useState, type MouseEvent } from 'react';
+import { useMemo, type MouseEvent } from 'react';
 import { FilterOptions, GitHubRepo, GraphData } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
-import FilterPanel from './FilterPanel';
 import { getBacklinks, getOutlinks, renderWikiLinks } from '../utils/wikiLinks';
 import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
 import ThemeSelector from './ThemeSelector';
+
 interface MainLayoutProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
@@ -18,6 +18,7 @@ interface MainLayoutProps {
   error: string | null;
   showCreateModal: boolean;
   isEditingReadme: boolean;
+  viewMode: 'notes' | 'graph';
   onSelectRepo: (repoName: string | null) => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
   onRefresh: () => void;
@@ -26,6 +27,7 @@ interface MainLayoutProps {
   onSaveReadme: (repoName: string, content: string) => Promise<void>;
   onShowCreateModal: (show: boolean) => void;
   onEditReadme: (editing: boolean) => void;
+  onSetViewMode: (mode: 'notes' | 'graph') => void;
 }
 
 function MainLayout({
@@ -39,16 +41,16 @@ function MainLayout({
   error,
   showCreateModal,
   isEditingReadme,
+  viewMode,
   onSelectRepo,
-  onUpdateFilters,
   onRefresh,
   onLogout,
   onCreateRepo,
   onSaveReadme,
   onShowCreateModal,
   onEditReadme,
+  onSetViewMode,
 }: MainLayoutProps) {
-  const [showSidebar, setShowSidebar] = useState(true);
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
 
   const filteredRepos = useMemo(
@@ -64,19 +66,6 @@ function MainLayout({
         return true;
       }),
     [repos, filterOptions, graphData.nodes]
-  );
-
-  const allTopics = useMemo(() => Array.from(new Set(repos.flatMap((repo) => repo.topics))), [repos]);
-
-  const stats = useMemo(
-    () => ({
-      total: repos.length,
-      private: repos.filter((repo) => repo.private).length,
-      public: repos.filter((repo) => !repo.private).length,
-      withReadme: Object.keys(readmeContents).length,
-      orphans: graphData.nodes.filter((node) => node.data.isOrphan).length,
-    }),
-    [repos, readmeContents, graphData.nodes]
   );
 
   const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
@@ -105,20 +94,28 @@ function MainLayout({
       <header className="main-header">
         <div className="header-left">
           <h1 className="logo">Gitsidian</h1>
-          <span className="stats">
-            {stats.total} repos · {stats.withReadme} with README · {stats.orphans} orphans
-          </span>
         </div>
         <div className="header-right">
+          {/* View mode toggle */}
+          <button
+            className={`view-toggle-btn ${viewMode === 'notes' ? 'active' : ''}`}
+            onClick={() => onSetViewMode('notes')}
+          >
+            📝 Notes
+          </button>
+          <button
+            className={`view-toggle-btn ${viewMode === 'graph' ? 'active' : ''}`}
+            onClick={() => onSetViewMode('graph')}
+          >
+            📊 Graph
+          </button>
+          <div className="header-separator" />
           <button onClick={() => onShowCreateModal(true)} className="create-btn">
             ✚ New Note
           </button>
           <ThemeSelector />
           <button onClick={onRefresh} className="refresh-btn" disabled={isLoading}>
             {isLoading ? 'Loading...' : '↻ Refresh'}
-          </button>
-          <button onClick={() => setShowSidebar(!showSidebar)} className="toggle-sidebar-btn">
-            {showSidebar ? '◀ Hide List' : '▶ Show List'}
           </button>
           <button onClick={onLogout} className="logout-btn">
             Logout
@@ -130,76 +127,107 @@ function MainLayout({
       {isLoadingReadmes && <div className="loading-readmes">⏳ Loading README files...</div>}
 
       <div className="main-content">
-        <div className="graph-container">
-          <GraphView
-            data={graphData}
-            filterOptions={filterOptions}
-            selectedRepo={selectedRepo?.name || null}
-            onSelectNode={onSelectRepo}
-          />
-        </div>
-
-        {showSidebar && (
-          <aside className="sidebar">
-            <FilterPanel
+        {viewMode === 'graph' ? (
+          /* GRAPH MODE: full-width graph like before */
+          <div className="graph-container">
+            <GraphView
+              data={graphData}
               filterOptions={filterOptions}
-              topics={allTopics}
-              stats={stats}
-              onUpdateFilters={onUpdateFilters}
-            />
-
-            <RepoList
-              repos={filteredRepos}
-              readmeContents={readmeContents}
               selectedRepo={selectedRepo?.name || null}
-              onSelectRepo={onSelectRepo}
+              onSelectNode={onSelectRepo}
             />
+          </div>
+        ) : (
+          /* NOTES MODE: 3-panel Obsidian layout */
+          <>
+            {/* LEFT: File Explorer */}
+            <aside className="explorer-sidebar">
+              <div className="explorer-header">
+                <h3>Notes</h3>
+                <span className="explorer-count">{repos.length}</span>
+              </div>
+              <RepoList
+                repos={filteredRepos}
+                readmeContents={readmeContents}
+                selectedRepo={selectedRepo?.name || null}
+                onSelectRepo={onSelectRepo}
+              />
+              <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)}>
+                + New Note
+              </button>
+            </aside>
 
-            {selectedRepo && (
-              <div className="readme-viewer">
-                <div className="readme-viewer-header">
-                  <h3>{stripPrefix(selectedRepo.name)}</h3>
-                  <div className="readme-viewer-actions">
-                    <a
-                      className="github-link"
-                      href={selectedRepo.html_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      View on GitHub
-                    </a>
-                    <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
-                      ✎ Edit
-                    </button>
-                  </div>
-                </div>
-
-                <div className="readme-meta">
-                  {selectedRepo.language && <span className="language-badge">{selectedRepo.language}</span>}
-                  {selectedRepo.topics.map((topic) => (
-                    <span key={topic} className="topic-tag">
-                      {topic}
-                    </span>
-                  ))}
-                </div>
-
-                {isEditingReadme && selectedRepo ? (
+            {/* CENTER: Note Viewer/Editor */}
+            <main className="note-main">
+              {selectedRepo ? (
+                isEditingReadme ? (
                   <ReadmeEditor
+                    repoName={selectedRepo.name}
                     initialContent={selectedReadme}
                     onSave={(content) => void onSaveReadme(selectedRepo.name, content)}
                     onCancel={() => onEditReadme(false)}
                   />
-                ) : selectedReadme ? (
-                  <div
-                    className="readme-content"
-                    onClick={handleReadmeClick}
-                    dangerouslySetInnerHTML={{ __html: renderWikiLinks(selectedReadme) }}
-                  />
                 ) : (
-                  <div className="no-readme">No README found</div>
-                )}
+                  <div className="note-viewer">
+                    <div className="note-viewer-header">
+                      <h2>{stripPrefix(selectedRepo.name)}</h2>
+                      <div className="note-viewer-actions">
+                        <a
+                          className="github-link"
+                          href={selectedRepo.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View on GitHub
+                        </a>
+                        <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
+                          ✎ Edit
+                        </button>
+                      </div>
+                    </div>
+                    {selectedRepo.language || selectedRepo.topics.length > 0 ? (
+                      <div className="note-meta">
+                        {selectedRepo.language && (
+                          <span className="language-badge">{selectedRepo.language}</span>
+                        )}
+                        {selectedRepo.topics.map((topic) => (
+                          <span key={topic} className="topic-tag">
+                            {topic}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {selectedReadme ? (
+                      <div
+                        className="note-content"
+                        onClick={handleReadmeClick}
+                        dangerouslySetInnerHTML={{ __html: renderWikiLinks(selectedReadme) }}
+                      />
+                    ) : (
+                      <div className="note-empty">
+                        <p>No README yet</p>
+                        <button onClick={() => onEditReadme(true)} className="create-readme-btn">
+                          Create README
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              ) : (
+                <div className="note-placeholder">
+                  <div className="placeholder-content">
+                    <h2>Gitsidian</h2>
+                    <p>Select a note from the sidebar, or create a new one.</p>
+                    <p className="placeholder-hint">{repos.length} notes available</p>
+                  </div>
+                </div>
+              )}
+            </main>
 
-                <div className="links-section">
+            {/* RIGHT: Backlinks & Outlinks panel */}
+            {selectedRepo && !isEditingReadme && (
+              <aside className="links-sidebar">
+                <div className="links-panel">
                   <h4>Linked from</h4>
                   {backlinks.length > 0 ? (
                     <div className="links-list">
@@ -210,7 +238,7 @@ function MainLayout({
                           onClick={() => onSelectRepo(backlink.source)}
                         >
                           <span>{stripPrefix(backlink.source)}</span>
-                          {backlink.alias && <span>as {backlink.alias}</span>}
+                          {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
                         </div>
                       ))}
                     </div>
@@ -218,8 +246,7 @@ function MainLayout({
                     <div className="no-links">No backlinks</div>
                   )}
                 </div>
-
-                <div className="links-section">
+                <div className="links-panel">
                   <h4>Links to</h4>
                   {outlinks.length > 0 ? (
                     <div className="links-list">
@@ -230,7 +257,7 @@ function MainLayout({
                           onClick={() => onSelectRepo(outlink.target)}
                         >
                           <span>{stripPrefix(outlink.target)}</span>
-                          {outlink.alias && <span>as {outlink.alias}</span>}
+                          {outlink.alias && <span className="link-alias">as {outlink.alias}</span>}
                         </div>
                       ))}
                     </div>
@@ -238,9 +265,9 @@ function MainLayout({
                     <div className="no-links">No outgoing links</div>
                   )}
                 </div>
-              </div>
+              </aside>
             )}
-          </aside>
+          </>
         )}
       </div>
 

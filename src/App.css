@@ -1096,55 +1096,7 @@ body {
   cursor: not-allowed;
 }
 
-.readme-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
 
-.readme-textarea {
-  width: 100%;
-  min-height: 300px;
-  padding: 1rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  font-size: 0.9rem;
-  line-height: 1.6;
-  resize: vertical;
-}
-
-.readme-textarea:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-}
-
-.editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-}
-
-.editor-actions .cancel-btn {
-  padding: 0.4rem 1rem;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.editor-actions .save-btn {
-  padding: 0.4rem 1rem;
-  background: var(--accent-success);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-}
 .theme-selector {
   position: relative;
 }
@@ -1199,3 +1151,467 @@ body {
   color: white;
 }
 
+/* ========================================
+   Full-Screen Editor (Obsidian-like)
+   ======================================== */
+
+.editor-fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary);
+}
+
+/* Editor Header */
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.editor-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.editor-icon {
+  font-size: 1.25rem;
+}
+
+.editor-title h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.editor-unsaved {
+  color: var(--accent-warning);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.editor-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.editor-tab {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.editor-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.editor-tab.active {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+.editor-header-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  margin: 0 0.25rem;
+}
+
+.editor-cancel-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.editor-cancel-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.editor-save-btn {
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  background: var(--accent-success);
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.editor-save-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.editor-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Editor Toolbar */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 1.25rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  gap: 0.25rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.editor-toolbar button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.editor-toolbar button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+  margin: 0 0.35rem;
+}
+
+/* Editor Body */
+.editor-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  padding: 1.5rem 2rem;
+  background: var(--bg-primary);
+  border: none;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+}
+
+.editor-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.editor-preview {
+  width: 100%;
+  height: 100%;
+  padding: 1.5rem 2rem;
+  overflow-y: auto;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.editor-preview .wikilink {
+  color: var(--accent-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+/* Editor Footer */
+.editor-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 1.25rem;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.editor-stats {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.editor-shortcut-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+/* ========================================
+   Obsidian-like 3-Panel Layout
+   ======================================== */
+
+/* View Mode Toggle */
+.view-toggle-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-toggle-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.view-toggle-btn:hover:not(.active) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.header-separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border-color);
+}
+
+/* Explorer Sidebar (Left) */
+.explorer-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.explorer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.explorer-header h3 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.explorer-count {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 0.1rem 0.5rem;
+  border-radius: 10px;
+}
+
+.explorer-new-btn {
+  margin: 0.5rem;
+  padding: 0.5rem;
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.explorer-new-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+/* Note Main Area (Center) */
+.note-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.note-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.note-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.note-viewer-header h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.note-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.note-meta {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.note-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: var(--text-primary);
+}
+
+.note-content .wikilink {
+  color: var(--accent-secondary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.note-content .wikilink:hover {
+  text-decoration-style: solid;
+}
+
+.note-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-secondary);
+}
+
+.create-readme-btn {
+  padding: 0.5rem 1.25rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.create-readme-btn:hover {
+  opacity: 0.9;
+}
+
+.note-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-content {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.placeholder-content h2 {
+  font-size: 2rem;
+  color: var(--accent-primary);
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.placeholder-content p {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.placeholder-hint {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+/* Links Sidebar (Right) */
+.links-sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  overflow-y: auto;
+  padding: 0;
+}
+
+.links-panel {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.links-panel h4 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.link-alias {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

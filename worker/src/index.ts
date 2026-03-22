@@ -57,7 +57,7 @@ function handleOptions(request: Request, env: Env): Response {
 async function handleCallback(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
+  // const state = url.searchParams.get("state");
 
   if (!code) {
     return new Response("Missing code parameter", { status: 400 });

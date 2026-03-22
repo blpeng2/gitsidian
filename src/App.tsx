@@ -24,6 +24,7 @@ const initialState: AppState = {
   isLoading: false,
   isLoadingReadmes: false,
   error: null,
+  viewMode: 'notes' as const,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -93,6 +94,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         error: action.payload,
+      };
+    case 'SET_VIEW_MODE':
+      return {
+        ...state,
+        viewMode: action.payload,
       };
     default:
       return state;
@@ -287,6 +293,8 @@ function App() {
       onSaveReadme={handleSaveReadme}
       onShowCreateModal={(show: boolean) => dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show })}
       onEditReadme={(editing: boolean) => dispatch({ type: 'SET_EDITING_README', payload: editing })}
+      viewMode={state.viewMode}
+      onSetViewMode={(mode: 'notes' | 'graph') => dispatch({ type: 'SET_VIEW_MODE', payload: mode })}
     />
   );
 }

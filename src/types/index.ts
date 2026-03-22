@@ -78,6 +78,7 @@ export interface AppState {
   isLoading: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
+  viewMode: 'notes' | 'graph';
 }
 
 // Action types
@@ -92,4 +93,5 @@ export type AppAction =
   | { type: 'SET_EDITING_README'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_READMES'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null };
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_VIEW_MODE'; payload: 'notes' | 'graph' };
