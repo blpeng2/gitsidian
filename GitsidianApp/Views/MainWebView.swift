@@ -160,6 +160,27 @@ struct MainWebView: NSViewRepresentable {
                 webView.evaluateJavaScript("document.querySelector('.view-toggle-btn:nth-child(2)')?.click()")
             }
         )
+
+        coordinator.observers.append(
+            NotificationCenter.default.addObserver(forName: .oauthCallback, object: nil, queue: .main) { notification in
+                if let token = notification.userInfo?["access_token"] as? String {
+                    let escapedToken = token.replacingOccurrences(of: "'", with: "\\'")
+                    let js = """
+                        (function() {
+                            localStorage.setItem('gitsidian_access_token', '\(escapedToken)');
+                            window.location.search = '?access_token=\(escapedToken)';
+                        })()
+                    """
+                    webView.evaluateJavaScript(js) { _, error in
+                        if let error = error {
+                            print("[Gitsidian] Token injection error:", error)
+                        } else {
+                            print("[Gitsidian] Token injected successfully")
+                        }
+                    }
+                }
+            }
+        )
     }
     
     func makeCoordinator() -> Coordinator {
@@ -174,17 +195,22 @@ struct MainWebView: NSViewRepresentable {
             observers.forEach { NotificationCenter.default.removeObserver($0) }
         }
         
-        // Open external links in default browser
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let url = navigationAction.request.url,
-               navigationAction.navigationType == .linkActivated,
-               url.host != nil,
-               !url.isFileURL {
-                // External link — open in browser
-                if url.host != "localhost" && url.host != "127.0.0.1" {
+            if let url = navigationAction.request.url {
+                if url.host == "github.com" && url.path.contains("/login/oauth/authorize") {
                     NSWorkspace.shared.open(url)
                     decisionHandler(.cancel)
                     return
+                }
+
+                if navigationAction.navigationType == .linkActivated,
+                   url.host != nil,
+                   !url.isFileURL {
+                    if url.host != "localhost" && url.host != "127.0.0.1" {
+                        NSWorkspace.shared.open(url)
+                        decisionHandler(.cancel)
+                        return
+                    }
                 }
             }
             decisionHandler(.allow)

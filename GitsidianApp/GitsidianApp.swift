@@ -14,6 +14,18 @@ struct GitsidianApp: App {
                 devMode: $devMode
             )
             .frame(minWidth: 900, minHeight: 600)
+            .onOpenURL { url in
+                if url.scheme == "gitsidian" && url.host == "callback" {
+                    if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                       let token = components.queryItems?.first(where: { $0.name == "access_token" })?.value {
+                        NotificationCenter.default.post(
+                            name: .oauthCallback,
+                            object: nil,
+                            userInfo: ["access_token": token]
+                        )
+                    }
+                }
+            }
         }
         .windowStyle(.titleBar)
         .commands {
@@ -62,4 +74,5 @@ extension Notification.Name {
     static let switchToNotes = Notification.Name("switchToNotes")
     static let switchToGraph = Notification.Name("switchToGraph")
     static let reloadWebApp = Notification.Name("reloadWebApp")
+    static let oauthCallback = Notification.Name("oauthCallback")
 }

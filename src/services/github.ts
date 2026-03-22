@@ -12,7 +12,12 @@ class GitHubService {
       throw new Error('Missing VITE_OAUTH_CLIENT_ID');
     }
 
-    const state = crypto.randomUUID();
+    const isDesktop = !!(window as any).webkit?.messageHandlers;
+    const stateObj = {
+      nonce: crypto.randomUUID(),
+      platform: isDesktop ? 'desktop' : 'web',
+    };
+    const state = btoa(JSON.stringify(stateObj));
     sessionStorage.setItem('oauth_state', state);
 
     const params = new URLSearchParams({

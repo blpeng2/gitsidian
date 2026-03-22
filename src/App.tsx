@@ -234,33 +234,6 @@ function App() {
     }
   };
 
-  const handleLogin = async (token: string) => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_ERROR', payload: null });
-
-    try {
-      githubService.setAccessToken(token);
-      const isValid = await githubService.validateToken();
-
-      if (isValid) {
-        storageService.setAccessToken(token);
-        dispatch({
-          type: 'SET_AUTHENTICATED',
-          payload: { isAuthenticated: true, accessToken: token },
-        });
-      } else {
-        throw new Error('Invalid access token');
-      }
-    } catch (error) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: error instanceof Error ? error.message : 'Login failed',
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }
-  };
-
   const handleLogout = () => {
     storageService.removeAccessToken();
     dispatch({
@@ -360,7 +333,7 @@ function App() {
   });
 
   if (!state.isAuthenticated) {
-    return <LoginScreen onLogin={handleLogin} isLoading={state.isLoading} error={state.error} />;
+    return <LoginScreen isLoading={state.isLoading} error={state.error} />;
   }
 
   return (

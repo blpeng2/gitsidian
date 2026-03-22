@@ -57,10 +57,21 @@ function handleOptions(request: Request, env: Env): Response {
 async function handleCallback(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  // const state = url.searchParams.get("state");
+  const state = url.searchParams.get("state");
 
   if (!code) {
     return new Response("Missing code parameter", { status: 400 });
+  }
+
+  let platform = "web";
+  if (state) {
+    try {
+      const stateObj = JSON.parse(atob(state));
+      if (stateObj.platform === "desktop") {
+        platform = "desktop";
+      }
+    } catch {
+    }
   }
 
   // Exchange code for access token
@@ -83,7 +94,11 @@ async function handleCallback(request: Request, env: Env): Promise<Response> {
     return new Response(`Token exchange failed: ${tokenData.error}`, { status: 400 });
   }
 
-  // Redirect back to frontend with token in fragment (not logged in server logs)
+  if (platform === "desktop") {
+    const redirectUrl = `gitsidian://callback?access_token=${tokenData.access_token}`;
+    return Response.redirect(redirectUrl, 302);
+  }
+
   const redirectUrl = new URL(env.ALLOWED_ORIGIN);
   redirectUrl.searchParams.set('access_token', tokenData.access_token);
 
