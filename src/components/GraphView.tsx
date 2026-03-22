@@ -9,6 +9,23 @@ interface GraphViewProps {
   onSelectNode: (repoName: string | null) => void;
 }
 
+function getThemeColors() {
+  const style = getComputedStyle(document.documentElement);
+  return {
+    bgPrimary: style.getPropertyValue('--bg-primary').trim(),
+    bgSecondary: style.getPropertyValue('--bg-secondary').trim(),
+    textPrimary: style.getPropertyValue('--text-primary').trim(),
+    textSecondary: style.getPropertyValue('--text-secondary').trim(),
+    accentPrimary: style.getPropertyValue('--accent-primary').trim(),
+    accentSecondary: style.getPropertyValue('--accent-secondary').trim(),
+    accentSuccess: style.getPropertyValue('--accent-success').trim(),
+    accentWarning: style.getPropertyValue('--accent-warning').trim(),
+    accentDanger: style.getPropertyValue('--accent-danger').trim(),
+    accentPurple: style.getPropertyValue('--accent-purple').trim(),
+    borderColor: style.getPropertyValue('--border-color').trim(),
+  };
+}
+
 function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -43,6 +60,8 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
   useEffect(() => {
     if (!containerRef.current) return;
 
+    const colors = getThemeColors();
+
     const cy = cytoscape({
       container: containerRef.current,
       elements: {
@@ -58,12 +77,12 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
             'text-halign': 'center',
             'text-margin-y': 8,
             'font-size': '12px',
-            color: '#e0e0e0',
-            'background-color': '#4a90d9',
+            color: colors.textPrimary,
+            'background-color': colors.accentPrimary,
             width: 40,
             height: 40,
             'border-width': 2,
-            'border-color': '#2d5f8a',
+            'border-color': colors.borderColor,
             'transition-property': 'background-color, border-color, width, height, opacity',
             'transition-duration': 200,
           },
@@ -71,8 +90,8 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
         {
           selector: 'node[?isPrivate]',
           style: {
-            'background-color': '#e67e22',
-            'border-color': '#b36318',
+            'background-color': colors.accentWarning,
+            'border-color': colors.accentWarning,
           },
         },
         {
@@ -87,8 +106,8 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
           style: {
             width: 50,
             height: 50,
-            'background-color': '#9b59b6',
-            'border-color': '#8e44ad',
+            'background-color': colors.accentPurple,
+            'border-color': colors.accentPurple,
             'border-width': 4,
           },
         },
@@ -96,14 +115,14 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
           selector: 'node:active',
           style: {
             'overlay-opacity': 0.2,
-            'overlay-color': '#fff',
+            'overlay-color': colors.textPrimary,
           },
         },
         {
           selector: 'edge',
           style: {
             width: 2,
-            'line-color': '#666',
+            'line-color': colors.textSecondary,
             'curve-style': 'bezier',
             opacity: 0.6,
           },
@@ -111,29 +130,29 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
         {
           selector: 'edge[type="wikilink"]',
           style: {
-            'line-color': '#3498db',
+            'line-color': colors.accentSecondary,
             width: 3,
           },
         },
         {
           selector: 'edge[type="topic"]',
           style: {
-            'line-color': '#95a5a6',
+            'line-color': colors.textSecondary,
             'line-style': 'dashed',
           },
         },
         {
           selector: 'edge:selected',
           style: {
-            'line-color': '#9b59b6',
+            'line-color': colors.accentPurple,
             width: 4,
           },
         },
         {
           selector: '.search-match',
           style: {
-            'background-color': '#f1c40f',
-            'border-color': '#f39c12',
+            'background-color': colors.accentWarning,
+            'border-color': colors.accentWarning,
             width: 50,
             height: 50,
             'z-index': 999,
@@ -148,13 +167,13 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
         {
           selector: '.local-hidden',
           style: {
-            'display': 'none',
+            display: 'none',
           },
         },
         {
           selector: '.hidden',
           style: {
-            'display': 'none',
+            display: 'none',
           },
         },
       ],
@@ -215,7 +234,51 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
 
     cyRef.current = cy;
 
+    const observer = new MutationObserver(() => {
+      const newColors = getThemeColors();
+      cy.style()
+        .selector('node').style({
+          color: newColors.textPrimary,
+          'background-color': newColors.accentPrimary,
+          'border-color': newColors.borderColor,
+        })
+        .selector('node[?isPrivate]').style({
+          'background-color': newColors.accentWarning,
+          'border-color': newColors.accentWarning,
+        })
+        .selector('node:selected').style({
+          'background-color': newColors.accentPurple,
+          'border-color': newColors.accentPurple,
+        })
+        .selector('node:active').style({
+          'overlay-color': newColors.textPrimary,
+        })
+        .selector('edge').style({
+          'line-color': newColors.textSecondary,
+        })
+        .selector('edge[type="wikilink"]').style({
+          'line-color': newColors.accentSecondary,
+        })
+        .selector('edge[type="topic"]').style({
+          'line-color': newColors.textSecondary,
+        })
+        .selector('edge:selected').style({
+          'line-color': newColors.accentPurple,
+        })
+        .selector('.search-match').style({
+          'background-color': newColors.accentWarning,
+          'border-color': newColors.accentWarning,
+        })
+        .update();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
     return () => {
+      observer.disconnect();
       cy.destroy();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
