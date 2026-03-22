@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_GITHUB_TOKEN?: string;
+  readonly VITE_OAUTH_CLIENT_ID?: string;
 }
 
 interface ImportMeta {
