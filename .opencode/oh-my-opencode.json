@@ -1,0 +1,3 @@
+{
+  "disabled_hooks": ["todo-continuation-enforcer", "gpt-permission-continuation"]
+}
