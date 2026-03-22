@@ -6,7 +6,7 @@ import FilterPanel from './FilterPanel';
 import { getBacklinks, getOutlinks, renderWikiLinks } from '../utils/wikiLinks';
 import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
-
+import ThemeSelector from './ThemeSelector';
 interface MainLayoutProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
@@ -113,6 +113,7 @@ function MainLayout({
           <button onClick={() => onShowCreateModal(true)} className="create-btn">
             ✚ New Note
           </button>
+          <ThemeSelector />
           <button onClick={onRefresh} className="refresh-btn" disabled={isLoading}>
             {isLoading ? 'Loading...' : '↻ Refresh'}
           </button>
