@@ -154,6 +154,12 @@ class GitHubService {
       content: encoded,
     });
 
+    await this.octokit.repos.replaceAllTopics({
+      owner: repo.owner.login,
+      repo: repo.name,
+      names: ['inbox'],
+    });
+
     return {
       id: repo.id,
       name: repo.name,
@@ -161,7 +167,7 @@ class GitHubService {
       description: repo.description,
       private: repo.private,
       html_url: repo.html_url,
-      topics: repo.topics || [],
+      topics: ['inbox'],
       updated_at: repo.updated_at || new Date().toISOString(),
       created_at: repo.created_at || new Date().toISOString(),
       language: repo.language,

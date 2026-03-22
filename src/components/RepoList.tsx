@@ -1,32 +1,55 @@
 import { useState, useMemo } from 'react';
-import { GitHubRepo } from '../types';
+import { GitHubRepo, NoteCategory } from '../types';
+import { getCategoryIcon, getCategoryLabel, getRepoCategory } from '../utils/categoryRules';
 
 interface RepoListProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
   selectedRepo: string | null;
   onSelectRepo: (repoName: string | null) => void;
+  categoryFilter: NoteCategory | 'all';
+  onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
+  recommendations: Record<string, string>;
+  onMoveCategory: (repoName: string, category: NoteCategory) => void;
 }
 
-function RepoList({ repos, readmeContents, selectedRepo, onSelectRepo }: RepoListProps) {
+function RepoList({
+  repos,
+  readmeContents,
+  selectedRepo,
+  onSelectRepo,
+  categoryFilter,
+  onCategoryFilterChange,
+  recommendations,
+  onMoveCategory,
+}: RepoListProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'created'>('updated');
+  const [collapsedSections, setCollapsedSections] = useState<Record<NoteCategory, boolean>>({
+    inbox: false,
+    active: false,
+    reference: false,
+    archive: false,
+  });
+  const categories: (NoteCategory | 'all')[] = ['all', 'inbox', 'active', 'reference', 'archive'];
+  const displayCategories: NoteCategory[] = ['inbox', 'active', 'reference', 'archive'];
 
-  // Filter and sort repos
   const filteredRepos = useMemo(() => {
     let result = [...repos];
 
-    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(repo =>
-        repo.name.toLowerCase().includes(query) ||
-        repo.description?.toLowerCase().includes(query) ||
-        repo.topics.some(topic => topic.toLowerCase().includes(query))
+      result = result.filter((repo) =>
+        repo.name.toLowerCase().includes(query)
+        || repo.description?.toLowerCase().includes(query)
+        || repo.topics.some((topic) => topic.toLowerCase().includes(query))
       );
     }
 
-    // Sort
+    if (categoryFilter !== 'all') {
+      result = result.filter((repo) => getRepoCategory(repo) === categoryFilter);
+    }
+
     switch (sortBy) {
       case 'updated':
         result.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -40,9 +63,23 @@ function RepoList({ repos, readmeContents, selectedRepo, onSelectRepo }: RepoLis
     }
 
     return result;
-  }, [repos, searchQuery, sortBy]);
+  }, [repos, searchQuery, sortBy, categoryFilter]);
 
-  // Format date
+  const reposByCategory = useMemo(() => {
+    const grouped: Record<NoteCategory, GitHubRepo[]> = {
+      inbox: [],
+      active: [],
+      reference: [],
+      archive: [],
+    };
+
+    filteredRepos.forEach((repo) => {
+      grouped[getRepoCategory(repo)].push(repo);
+    });
+
+    return grouped;
+  }, [filteredRepos]);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -55,6 +92,76 @@ function RepoList({ repos, readmeContents, selectedRepo, onSelectRepo }: RepoLis
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
     return `${Math.floor(diffDays / 365)} years ago`;
+  };
+
+  const handleToggleSection = (category: NoteCategory) => {
+    setCollapsedSections((previous) => ({
+      ...previous,
+      [category]: !previous[category],
+    }));
+  };
+
+  const renderRepoItem = (repo: GitHubRepo) => {
+    const hasReadme = !!readmeContents[repo.name];
+    const isSelected = selectedRepo === repo.name;
+
+    return (
+      <div
+        key={repo.id}
+        className={`repo-item ${isSelected ? 'selected' : ''}`}
+        onClick={() => onSelectRepo(repo.name)}
+      >
+        <div className="repo-item-header">
+          <span className={`repo-visibility ${repo.private ? 'private' : 'public'}`}>
+            {repo.private ? '🔒' : '🌐'}
+          </span>
+          <span className="repo-category-badge">{getCategoryIcon(getRepoCategory(repo))}</span>
+          <span className="repo-name">{repo.name}</span>
+          {hasReadme && <span className="has-readme" title="Has README loaded">📄</span>}
+          {recommendations[repo.name] && (
+            <div className="recommendation-badge" title={recommendations[repo.name]}>
+              💡
+            </div>
+          )}
+          <div className="category-move-actions">
+            {(['inbox', 'active', 'reference', 'archive'] as NoteCategory[])
+              .filter((category) => category !== getRepoCategory(repo))
+              .map((category) => (
+                <button
+                  key={category}
+                  className="category-move-btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onMoveCategory(repo.name, category);
+                  }}
+                  title={`Move to ${getCategoryLabel(category)}`}
+                >
+                  {getCategoryIcon(category)}
+                </button>
+              ))}
+          </div>
+        </div>
+        {repo.description && (
+          <p className="repo-description">{repo.description}</p>
+        )}
+        <div className="repo-meta">
+          {repo.language && (
+            <span className="repo-language">{repo.language}</span>
+          )}
+          <span className="repo-updated">{formatDate(repo.updated_at)}</span>
+        </div>
+        {repo.topics.length > 0 && (
+          <div className="repo-topics">
+            {repo.topics.slice(0, 3).map((topic) => (
+              <span key={topic} className="topic-tag">{topic}</span>
+            ))}
+            {repo.topics.length > 3 && (
+              <span className="topic-more">+{repo.topics.length - 3}</span>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -80,50 +187,47 @@ function RepoList({ repos, readmeContents, selectedRepo, onSelectRepo }: RepoLis
           </select>
         </div>
       </div>
+      <div className="category-tabs">
+        {categories.map((category) => (
+          <button
+            key={category}
+            className={`category-tab ${categoryFilter === category ? 'active' : ''}`}
+            onClick={() => onCategoryFilterChange(category)}
+          >
+            {category === 'all' ? '📋 All' : `${getCategoryIcon(category)} ${getCategoryLabel(category)}`}
+            <span className="category-count">
+              {category === 'all'
+                ? repos.length
+                : repos.filter((repo) => getRepoCategory(repo) === category).length}
+            </span>
+          </button>
+        ))}
+      </div>
 
       <div className="repo-list-items">
         {filteredRepos.length === 0 ? (
           <div className="no-repos">No repositories found</div>
         ) : (
-          filteredRepos.map(repo => {
-            const hasReadme = !!readmeContents[repo.name];
-            const isSelected = selectedRepo === repo.name;
-
-            return (
-              <div
-                key={repo.id}
-                className={`repo-item ${isSelected ? 'selected' : ''}`}
-                onClick={() => onSelectRepo(repo.name)}
-              >
-                <div className="repo-item-header">
-                  <span className={`repo-visibility ${repo.private ? 'private' : 'public'}`}>
-                    {repo.private ? '🔒' : '🌐'}
-                  </span>
-                  <span className="repo-name">{repo.name}</span>
-                  {hasReadme && <span className="has-readme" title="Has README loaded">📄</span>}
-                </div>
-                {repo.description && (
-                  <p className="repo-description">{repo.description}</p>
-                )}
-                <div className="repo-meta">
-                  {repo.language && (
-                    <span className="repo-language">{repo.language}</span>
-                  )}
-                  <span className="repo-updated">{formatDate(repo.updated_at)}</span>
-                </div>
-                {repo.topics.length > 0 && (
-                  <div className="repo-topics">
-                    {repo.topics.slice(0, 3).map(topic => (
-                      <span key={topic} className="topic-tag">{topic}</span>
-                    ))}
-                    {repo.topics.length > 3 && (
-                      <span className="topic-more">+{repo.topics.length - 3}</span>
-                    )}
+          displayCategories
+            .filter((category) => reposByCategory[category].length > 0)
+            .map((category) => (
+              <div key={category} className="repo-category-section">
+                <button
+                  className="repo-category-header"
+                  onClick={() => handleToggleSection(category)}
+                >
+                  <span>{collapsedSections[category] ? '▸' : '▾'}</span>
+                  <span>{getCategoryIcon(category)}</span>
+                  <span>{getCategoryLabel(category)}</span>
+                  <span className="repo-category-size">{reposByCategory[category].length}</span>
+                </button>
+                {!collapsedSections[category] && (
+                  <div className="repo-category-items">
+                    {reposByCategory[category].map((repo) => renderRepoItem(repo))}
                   </div>
                 )}
               </div>
-            );
-          })
+            ))
         )}
       </div>
     </div>

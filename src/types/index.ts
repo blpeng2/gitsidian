@@ -65,6 +65,15 @@ export interface FilterOptions {
   topicFilter: string | null;
 }
 
+export type NoteCategory = 'inbox' | 'active' | 'reference' | 'archive';
+
+export interface CategoryRecommendation {
+  repoName: string;
+  currentCategory: NoteCategory;
+  suggestedCategory: NoteCategory;
+  reason: string;
+}
+
 // App state
 export interface AppState {
   isAuthenticated: boolean;
@@ -80,6 +89,7 @@ export interface AppState {
   isLoadingReadmes: boolean;
   error: string | null;
   viewMode: 'notes' | 'graph';
+  categoryFilter: NoteCategory | 'all';
 }
 
 // Action types
@@ -98,4 +108,6 @@ export type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_READMES'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_VIEW_MODE'; payload: 'notes' | 'graph' };
+  | { type: 'SET_VIEW_MODE'; payload: 'notes' | 'graph' }
+  | { type: 'SET_CATEGORY_FILTER'; payload: NoteCategory | 'all' }
+  | { type: 'SET_REPO_CATEGORY'; payload: { repoName: string; category: NoteCategory } };

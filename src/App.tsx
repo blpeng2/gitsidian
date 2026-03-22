@@ -1,8 +1,9 @@
 import { useEffect, useReducer } from 'react';
-import { AppAction, AppState, FilterOptions } from './types';
+import { AppAction, AppState, FilterOptions, NoteCategory } from './types';
 import { githubService } from './services/github';
 import { storageService } from './services/storage';
-import { generateGraphData } from './utils/wikiLinks';
+import { getBacklinks, generateGraphData } from './utils/wikiLinks';
+import { getCategoryIcon, getCategoryLabel, getRecommendations, setCategoryTopics } from './utils/categoryRules';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import './App.css';
@@ -26,6 +27,7 @@ const initialState: AppState = {
   isLoadingReadmes: false,
   error: null,
   viewMode: 'notes' as const,
+  categoryFilter: 'all' as NoteCategory | 'all',
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -138,6 +140,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         viewMode: action.payload,
       };
+    case 'SET_CATEGORY_FILTER':
+      return {
+        ...state,
+        categoryFilter: action.payload,
+      };
+    case 'SET_REPO_CATEGORY': {
+      const { repoName, category } = action.payload;
+      return {
+        ...state,
+        repos: state.repos.map((repo) =>
+          repo.name === repoName
+            ? { ...repo, topics: setCategoryTopics(repo.topics, category) }
+            : repo
+        ),
+      };
+    }
     default:
       return state;
   }
@@ -308,8 +326,38 @@ function App() {
     }
   };
 
+  const handleMoveCategory = async (repoName: string, category: NoteCategory) => {
+    try {
+      const repo = state.repos.find((r) => r.name === repoName);
+      if (!repo) {
+        return;
+      }
+
+      const newTopics = setCategoryTopics(repo.topics, category);
+      await githubService.updateTopics(repo.owner.login, repo.name, newTopics);
+      dispatch({ type: 'SET_REPO_CATEGORY', payload: { repoName, category } });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to move category',
+      });
+    }
+  };
+
   const graphData = generateGraphData(state.repos, state.readmeContents);
   const selectedRepoData = state.repos.find((repo) => repo.name === state.selectedRepo) || null;
+
+  const backlinkCounts: Record<string, number> = {};
+  state.repos.forEach((repo) => {
+    const backlinks = getBacklinks(repo.name, state.readmeContents);
+    backlinkCounts[repo.name] = backlinks.length;
+  });
+
+  const recommendations = getRecommendations(state.repos, state.readmeContents, backlinkCounts);
+  const recommendationMap: Record<string, string> = {};
+  recommendations.forEach((recommendation) => {
+    recommendationMap[recommendation.repoName] = `${getCategoryIcon(recommendation.suggestedCategory)} → ${getCategoryLabel(recommendation.suggestedCategory)}: ${recommendation.reason}`;
+  });
 
   if (!state.isAuthenticated) {
     return <LoginScreen onLogin={handleLogin} isLoading={state.isLoading} error={state.error} />;
@@ -328,8 +376,11 @@ function App() {
       showCreateModal={state.showCreateModal}
       isEditingReadme={state.isEditingReadme}
       openTabs={state.openTabs}
+      categoryFilter={state.categoryFilter}
+      recommendations={recommendationMap}
       onSelectRepo={handleSelectRepo}
       onCloseTab={(repoName: string) => dispatch({ type: 'CLOSE_TAB', payload: repoName })}
+      onCategoryFilterChange={(category: NoteCategory | 'all') => dispatch({ type: 'SET_CATEGORY_FILTER', payload: category })}
       onUpdateFilters={handleUpdateFilters}
       onRefresh={fetchRepos}
       onLogout={handleLogout}
@@ -341,6 +392,7 @@ function App() {
       onCloseEditor={handleCloseEditor}
       viewMode={state.viewMode}
       onSetViewMode={(mode: 'notes' | 'graph') => dispatch({ type: 'SET_VIEW_MODE', payload: mode })}
+      onMoveCategory={handleMoveCategory}
     />
   );
 }

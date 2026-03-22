@@ -1,5 +1,5 @@
-import { useMemo, type MouseEvent } from 'react';
-import { FilterOptions, GitHubRepo, GraphData } from '../types';
+import { type MouseEvent } from 'react';
+import { FilterOptions, GitHubRepo, GraphData, NoteCategory } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
 import { getBacklinks, getOutlinks } from '../utils/wikiLinks';
@@ -22,8 +22,11 @@ interface MainLayoutProps {
   isEditingReadme: boolean;
   viewMode: 'notes' | 'graph';
   openTabs: string[];
+  categoryFilter: NoteCategory | 'all';
+  recommendations: Record<string, string>;
   onSelectRepo: (repoName: string | null) => void;
   onCloseTab: (repoName: string) => void;
+  onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
   onRefresh: () => void;
   onLogout: () => void;
@@ -34,6 +37,7 @@ interface MainLayoutProps {
   onEditReadme: (editing: boolean) => void;
   onCloseEditor: () => void;
   onSetViewMode: (mode: 'notes' | 'graph') => void;
+  onMoveCategory: (repoName: string, category: NoteCategory) => void;
 }
 
 function MainLayout({
@@ -49,8 +53,11 @@ function MainLayout({
   isEditingReadme,
   viewMode,
   openTabs,
+  categoryFilter,
+  recommendations,
   onSelectRepo,
   onCloseTab,
+  onCategoryFilterChange,
   onRefresh,
   onCreateRepo,
   onReadmeSaved,
@@ -59,23 +66,9 @@ function MainLayout({
   onEditReadme,
   onCloseEditor,
   onSetViewMode,
+  onMoveCategory,
 }: MainLayoutProps) {
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
-
-  const filteredRepos = useMemo(
-    () =>
-      repos.filter((repo) => {
-        if (!filterOptions.showPrivate && repo.private) return false;
-        if (!filterOptions.showPublic && !repo.private) return false;
-        if (!filterOptions.showOrphans) {
-          const isOrphan = graphData.nodes.find((node) => node.data.id === repo.name)?.data.isOrphan;
-          if (isOrphan) return false;
-        }
-        if (filterOptions.topicFilter && !repo.topics.includes(filterOptions.topicFilter)) return false;
-        return true;
-      }),
-    [repos, filterOptions, graphData.nodes]
-  );
 
   const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
   const backlinks = selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : [];
@@ -153,10 +146,14 @@ function MainLayout({
                 <span className="explorer-count">{repos.length}</span>
               </div>
               <RepoList
-                repos={filteredRepos}
+                repos={repos}
                 readmeContents={readmeContents}
                 selectedRepo={selectedRepo?.name || null}
                 onSelectRepo={onSelectRepo}
+                categoryFilter={categoryFilter}
+                onCategoryFilterChange={onCategoryFilterChange}
+                recommendations={recommendations}
+                onMoveCategory={onMoveCategory}
               />
               <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)}>
                 + New Note

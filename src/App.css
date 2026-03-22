@@ -2052,3 +2052,135 @@ body {
 .editor-close-btn:hover {
   background: var(--bg-tertiary);
 }
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 0.5rem 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.category-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.category-tab:hover {
+  color: var(--text-primary);
+}
+
+.category-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+.category-count {
+  font-size: 0.65rem;
+  background: var(--bg-tertiary);
+  padding: 0 0.3rem;
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.repo-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.repo-category-badge {
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.recommendation-badge {
+  font-size: 0.7rem;
+  cursor: help;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.category-move-actions {
+  display: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.repo-item:hover .category-move-actions {
+  display: flex;
+}
+
+.category-move-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.category-move-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.repo-category-section {
+  margin-bottom: 0.6rem;
+}
+
+.repo-category-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.45rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+}
+
+.repo-category-header:hover {
+  color: var(--text-primary);
+}
+
+.repo-category-size {
+  margin-left: auto;
+  font-size: 0.7rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 0 0.3rem;
+}
+
+.repo-category-items {
+  padding-top: 0.2rem;
+}
