@@ -11,7 +11,32 @@ interface ReadmeEditorProps {
 function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [showPreview, setShowPreview] = useState(false);
+  const historyRef = useRef<string[]>([initialContent]);
+  const historyIndexRef = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const updateContent = useCallback((newContent: string) => {
+    const newHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+    newHistory.push(newContent);
+    if (newHistory.length > 200) newHistory.shift();
+    historyRef.current = newHistory;
+    historyIndexRef.current = newHistory.length - 1;
+    setContent(newContent);
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyIndexRef.current > 0) {
+      historyIndexRef.current--;
+      setContent(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      historyIndexRef.current++;
+      setContent(historyRef.current[historyIndexRef.current]);
+    }
+  }, []);
 
   const insertMarkdown = useCallback((before: string, after: string = '') => {
     const textarea = textareaRef.current;
@@ -20,7 +45,7 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
     const end = textarea.selectionEnd;
     const selectedText = content.substring(start, end);
     const newContent = content.substring(0, start) + before + selectedText + after + content.substring(end);
-    setContent(newContent);
+    updateContent(newContent);
     // Restore cursor position after state update
     setTimeout(() => {
       textarea.focus();
@@ -30,9 +55,19 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
         selectedText ? cursorPos : start + before.length
       );
     }, 0);
-  }, [content]);
+  }, [content, updateContent]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (e.key === 'z' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+      e.preventDefault();
+      redo();
+      return;
+    }
     if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       onSave(content);
@@ -113,7 +148,7 @@ function ReadmeEditor({ repoName, initialContent, onSave, onCancel }: ReadmeEdit
             ref={textareaRef}
             className="editor-textarea"
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => updateContent(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Write your note in Markdown...&#10;&#10;Use [[repo-name]] to link to other notes."
             spellCheck={false}
