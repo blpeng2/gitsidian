@@ -2,34 +2,21 @@ import { Octokit } from '@octokit/rest';
 import { GitHubRepo } from '../types';
 
 const OAUTH_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || '';
-const REDIRECT_URI = `${window.location.origin}/gitsidian/callback`;
-
-export interface DeviceFlowResponse {
-  device_code: string;
-  user_code: string;
-  verification_uri: string;
-  expires_in: number;
-  interval: number;
-}
-
-interface DeviceFlowTokenResponse {
-  access_token?: string;
-  token_type?: string;
-  scope?: string;
-  error?: string;
-  error_description?: string;
-}
+const OAUTH_WORKER_URL = import.meta.env.VITE_OAUTH_WORKER_URL || '';
 
 class GitHubService {
   private octokit: Octokit | null = null;
 
   getOAuthUrl(): string {
+    if (!OAUTH_CLIENT_ID) {
+      throw new Error('Missing VITE_OAUTH_CLIENT_ID');
+    }
+
     const state = crypto.randomUUID();
     sessionStorage.setItem('oauth_state', state);
 
     const params = new URLSearchParams({
       client_id: OAUTH_CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
       scope: 'repo read:user',
       state,
     });
@@ -41,101 +28,30 @@ class GitHubService {
     return OAUTH_CLIENT_ID.trim().length > 0;
   }
 
-  async initiateDeviceFlow(): Promise<DeviceFlowResponse> {
-    if (!this.hasOAuthClientId()) {
-      throw new Error('Missing VITE_OAUTH_CLIENT_ID configuration');
+  async handleOAuthCallback(code: string): Promise<string> {
+    if (!OAUTH_WORKER_URL) {
+      throw new Error('Missing VITE_OAUTH_WORKER_URL');
     }
 
-    const params = new URLSearchParams({
-      client_id: OAUTH_CLIENT_ID,
-      scope: 'repo read:user',
-    });
-
-    const response = await fetch('https://github.com/login/device/code', {
+    const response = await fetch(`${OAUTH_WORKER_URL}/exchange`, {
       method: 'POST',
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: params.toString(),
+      body: JSON.stringify({ code }),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to start GitHub device login');
+      const error = (await response.json()) as { error?: string };
+      throw new Error(error.error || 'OAuth exchange failed');
     }
 
-    const data = (await response.json()) as Partial<DeviceFlowResponse>;
-
-    if (!data.device_code || !data.user_code || !data.verification_uri || !data.expires_in || !data.interval) {
-      throw new Error('Invalid device flow response from GitHub');
+    const data = (await response.json()) as { access_token?: string };
+    if (!data.access_token) {
+      throw new Error('OAuth exchange did not return an access token');
     }
 
-    return {
-      device_code: data.device_code,
-      user_code: data.user_code,
-      verification_uri: data.verification_uri,
-      expires_in: data.expires_in,
-      interval: data.interval,
-    };
-  }
-
-  async pollForToken(deviceCode: string, intervalSeconds: number, expiresInSeconds: number): Promise<string> {
-    if (!this.hasOAuthClientId()) {
-      throw new Error('Missing VITE_OAUTH_CLIENT_ID configuration');
-    }
-
-    const timeoutAt = Date.now() + expiresInSeconds * 1000;
-    let pollInterval = intervalSeconds;
-
-    while (Date.now() < timeoutAt) {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval * 1000));
-
-      const params = new URLSearchParams({
-        client_id: OAUTH_CLIENT_ID,
-        device_code: deviceCode,
-        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-      });
-
-      const response = await fetch('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: params.toString(),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed while polling GitHub for access token');
-      }
-
-      const data = (await response.json()) as DeviceFlowTokenResponse;
-
-      if (data.access_token) {
-        return data.access_token;
-      }
-
-      if (data.error === 'authorization_pending') {
-        continue;
-      }
-
-      if (data.error === 'slow_down') {
-        pollInterval += 5;
-        continue;
-      }
-
-      if (data.error === 'access_denied') {
-        throw new Error('GitHub login was canceled');
-      }
-
-      if (data.error === 'expired_token') {
-        throw new Error('GitHub device code expired. Start login again.');
-      }
-
-      throw new Error(data.error_description || 'GitHub device login failed');
-    }
-
-    throw new Error('GitHub device login timed out. Start login again.');
+    return data.access_token;
   }
 
   // Initialize with access token

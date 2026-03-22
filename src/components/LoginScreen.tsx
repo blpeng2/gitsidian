@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { githubService, type DeviceFlowResponse } from '../services/github';
+import { githubService } from '../services/github';
 
 interface LoginScreenProps {
   onLogin: (token: string) => Promise<void> | void;
@@ -9,9 +9,7 @@ interface LoginScreenProps {
 
 function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
   const [token, setToken] = useState('');
-  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
-  const [deviceFlow, setDeviceFlow] = useState<DeviceFlowResponse | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,26 +18,12 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
     }
   };
 
-  const handleOAuthLogin = async () => {
+  const handleOAuthLogin = () => {
     setOauthError(null);
-    setIsOAuthLoading(true);
-
     try {
-      const flow = await githubService.initiateDeviceFlow();
-      setDeviceFlow(flow);
-      window.open(flow.verification_uri, '_blank', 'noopener,noreferrer');
-
-      const accessToken = await githubService.pollForToken(
-        flow.device_code,
-        flow.interval,
-        flow.expires_in,
-      );
-
-      await onLogin(accessToken);
+      window.location.href = githubService.getOAuthUrl();
     } catch (authError) {
       setOauthError(authError instanceof Error ? authError.message : 'GitHub login failed');
-    } finally {
-      setIsOAuthLoading(false);
     }
   };
 
@@ -65,7 +49,7 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
               onChange={(e) => setToken(e.target.value)}
               placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
               className="token-input"
-              disabled={isLoading || isOAuthLoading}
+              disabled={isLoading}
             />
             <p className="token-help">
               <a
@@ -88,7 +72,7 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
           <button
             type="submit"
             className="login-button"
-            disabled={isLoading || isOAuthLoading || !token.trim()}
+            disabled={isLoading || !token.trim()}
           >
             {isLoading ? 'Connecting...' : 'Connect'}
           </button>
@@ -101,31 +85,15 @@ function LoginScreen({ onLogin, isLoading, error }: LoginScreenProps) {
             type="button"
             className="oauth-button"
             onClick={handleOAuthLogin}
-            disabled={isLoading || isOAuthLoading || !githubService.hasOAuthClientId()}
+            disabled={isLoading || !githubService.hasOAuthClientId()}
           >
-            {isOAuthLoading ? 'Waiting for GitHub authorization...' : 'Login with GitHub'}
+            Login with GitHub
           </button>
 
           {!githubService.hasOAuthClientId() && (
             <p className="oauth-help">
-              Set <code>VITE_OAUTH_CLIENT_ID</code> to enable GitHub OAuth device flow.
+              Set <code>VITE_OAUTH_CLIENT_ID</code> and <code>VITE_OAUTH_WORKER_URL</code> to enable GitHub OAuth.
             </p>
-          )}
-
-          {deviceFlow && isOAuthLoading && (
-            <div className="device-flow-card">
-              <p>1. Open GitHub verification page.</p>
-              <p>
-                2. Enter code: <code>{deviceFlow.user_code}</code>
-              </p>
-              <a
-                href={deviceFlow.verification_uri}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open {deviceFlow.verification_uri}
-              </a>
-            </div>
           )}
         </form>
 

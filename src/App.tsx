@@ -85,7 +85,65 @@ function appReducer(state: AppState, action: AppAction): AppState {
 function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  const handleOAuthCallback = async (code: string, returnedState: string | null) => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      const expectedState = sessionStorage.getItem('oauth_state');
+      sessionStorage.removeItem('oauth_state');
+
+      if (expectedState && returnedState !== expectedState) {
+        throw new Error('OAuth state mismatch. Please try logging in again.');
+      }
+
+      const token = await githubService.handleOAuthCallback(code);
+      storageService.setAccessToken(token);
+      githubService.setAccessToken(token);
+      dispatch({
+        type: 'SET_AUTHENTICATED',
+        payload: { isAuthenticated: true, accessToken: token },
+      });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'OAuth failed',
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const code = urlParams.get('code');
+    const oauthState = urlParams.get('state');
+    const oauthError = urlParams.get('error');
+
+    if (oauthError) {
+      dispatch({ type: 'SET_ERROR', payload: `GitHub OAuth failed: ${oauthError}` });
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (accessToken) {
+      storageService.setAccessToken(accessToken);
+      githubService.setAccessToken(accessToken);
+      dispatch({
+        type: 'SET_AUTHENTICATED',
+        payload: { isAuthenticated: true, accessToken },
+      });
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    if (code) {
+      void handleOAuthCallback(code, oauthState);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
     const savedToken = storageService.getAccessToken();
     const envToken = import.meta.env.VITE_GITHUB_TOKEN;
     const tokenToUse = savedToken || (envToken && !savedToken ? envToken : null);
