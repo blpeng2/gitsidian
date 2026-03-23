@@ -12,7 +12,7 @@ class GitHubService {
       throw new Error('Missing VITE_OAUTH_CLIENT_ID');
     }
 
-    const isDesktop = !!(window as any).webkit?.messageHandlers;
+    const isDesktop = window.location.protocol === 'gitsidian:';
     const stateObj = {
       nonce: crypto.randomUUID(),
       platform: isDesktop ? 'desktop' : 'web',
