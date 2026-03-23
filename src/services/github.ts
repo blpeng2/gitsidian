@@ -150,7 +150,7 @@ class GitHubService {
     });
 
     const readmeContent = `# ${name}\n\n${description || ''}\n`;
-    const encoded = btoa(unescape(encodeURIComponent(readmeContent)));
+    const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(readmeContent)));
     await this.octokit.repos.createOrUpdateFileContents({
       owner: repo.owner.login,
       repo: repo.name,
