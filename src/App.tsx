@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useReducer } from 'react';
 import { AppAction, AppState, FilterOptions, NoteCategory } from './types';
 import { githubService } from './services/github';
 import { storageService } from './services/storage';
@@ -26,7 +26,7 @@ const initialState: AppState = {
   isLoading: false,
   isLoadingReadmes: false,
   error: null,
-  viewMode: 'notes' as const,
+  viewMode: 'graph' as const,
   categoryFilter: 'all' as NoteCategory | 'all',
 };
 
@@ -38,7 +38,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isAuthenticated: action.payload.isAuthenticated,
         accessToken: action.payload.accessToken,
       };
-    case 'SET_REPOS':
+    case 'SET_REPOS': {
       const availableRepoNames = new Set(action.payload.map((repo) => repo.name));
       const openTabs = state.openTabs.filter((repoName) => availableRepoNames.has(repoName));
       return {
@@ -50,6 +50,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
           : null,
         openTabs,
       };
+    }
     case 'ADD_REPO':
       return {
         ...state,
@@ -100,6 +101,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         openTabs: tabs,
         selectedRepo: newSelected,
+        viewMode: tabs.length === 0 ? 'graph' : state.viewMode,
       };
     }
     case 'SET_FILTER_OPTIONS':
@@ -164,6 +166,35 @@ function appReducer(state: AppState, action: AppAction): AppState {
 function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  const fetchRepos = useCallback(async () => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_LOADING_READMES', payload: false });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    dispatch({ type: 'SET_REPOS', payload: [] });
+
+    try {
+      const repos = await githubService.fetchRepos();
+      dispatch({ type: 'SET_REPOS', payload: repos });
+
+      dispatch({ type: 'SET_LOADING_READMES', payload: true });
+      const readmeContents = await githubService.fetchAllReadmes(repos);
+      Object.entries(readmeContents).forEach(([repoName, content]) => {
+        dispatch({
+          type: 'SET_README_CONTENT',
+          payload: { repoName, content },
+        });
+      });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to fetch repositories',
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
+      dispatch({ type: 'SET_LOADING_READMES', payload: false });
+    }
+  }, []);
+
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const accessToken = urlParams.get('access_token');
@@ -203,36 +234,7 @@ function App() {
     if (state.isAuthenticated && state.repos.length === 0) {
       void fetchRepos();
     }
-  }, [state.isAuthenticated, state.repos.length]);
-
-  const fetchRepos = async () => {
-    dispatch({ type: 'SET_LOADING', payload: true });
-    dispatch({ type: 'SET_LOADING_READMES', payload: false });
-    dispatch({ type: 'SET_ERROR', payload: null });
-    dispatch({ type: 'SET_REPOS', payload: [] });
-
-    try {
-      const repos = await githubService.fetchRepos();
-      dispatch({ type: 'SET_REPOS', payload: repos });
-
-      dispatch({ type: 'SET_LOADING_READMES', payload: true });
-      const readmeContents = await githubService.fetchAllReadmes(repos);
-      Object.entries(readmeContents).forEach(([repoName, content]) => {
-        dispatch({
-          type: 'SET_README_CONTENT',
-          payload: { repoName, content },
-        });
-      });
-    } catch (error) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: error instanceof Error ? error.message : 'Failed to fetch repositories',
-      });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
-      dispatch({ type: 'SET_LOADING_READMES', payload: false });
-    }
-  };
+  }, [state.isAuthenticated, state.repos.length, fetchRepos]);
 
   const handleLogout = () => {
     storageService.removeAccessToken();
@@ -333,7 +335,17 @@ function App() {
   });
 
   if (!state.isAuthenticated) {
-    return <LoginScreen isLoading={state.isLoading} error={state.error} />;
+    return (
+      <LoginScreen
+        isLoading={state.isLoading}
+        error={state.error}
+        onTokenLogin={(token: string) => {
+          storageService.setAccessToken(token);
+          githubService.setAccessToken(token);
+          dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
+        }}
+      />
+    );
   }
 
   return (
@@ -343,7 +355,6 @@ function App() {
       selectedRepo={selectedRepoData}
       graphData={graphData}
       filterOptions={state.filterOptions}
-      isLoading={state.isLoading}
       isLoadingReadmes={state.isLoadingReadmes}
       error={state.error}
       showCreateModal={state.showCreateModal}
@@ -355,7 +366,6 @@ function App() {
       onCloseTab={(repoName: string) => dispatch({ type: 'CLOSE_TAB', payload: repoName })}
       onCategoryFilterChange={(category: NoteCategory | 'all') => dispatch({ type: 'SET_CATEGORY_FILTER', payload: category })}
       onUpdateFilters={handleUpdateFilters}
-      onRefresh={fetchRepos}
       onLogout={handleLogout}
       onCreateRepo={handleCreateRepo}
       onReadmeSaved={handleReadmeSaved}
