@@ -1,4 +1,4 @@
-import { type MouseEvent } from 'react';
+import { type MouseEvent, useState, useRef, useCallback } from 'react';
 import { FilterOptions, GitHubRepo, GraphData, NoteCategory } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
@@ -6,8 +6,8 @@ import { getBacklinks, getOutlinks } from '../utils/wikiLinks';
 import { renderMarkdown } from '../utils/markdown';
 import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
-import ThemeSelector from './ThemeSelector';
 import TabBar from './TabBar';
+import TitleBar from './TitleBar';
 
 interface MainLayoutProps {
   repos: GitHubRepo[];
@@ -15,7 +15,6 @@ interface MainLayoutProps {
   selectedRepo: GitHubRepo | null;
   graphData: GraphData;
   filterOptions: FilterOptions;
-  isLoading: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
   showCreateModal: boolean;
@@ -28,7 +27,6 @@ interface MainLayoutProps {
   onCloseTab: (repoName: string) => void;
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
   onUpdateFilters: (options: Partial<FilterOptions>) => void;
-  onRefresh: () => void;
   onLogout: () => void;
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
   onReadmeSaved: (repoName: string, content: string) => void;
@@ -46,7 +44,6 @@ function MainLayout({
   selectedRepo,
   graphData,
   filterOptions,
-  isLoading,
   isLoadingReadmes,
   error,
   showCreateModal,
@@ -58,7 +55,6 @@ function MainLayout({
   onSelectRepo,
   onCloseTab,
   onCategoryFilterChange,
-  onRefresh,
   onCreateRepo,
   onReadmeSaved,
   onUpdateTopics,
@@ -69,6 +65,36 @@ function MainLayout({
   onMoveCategory,
 }: MainLayoutProps) {
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
+
+  const [showExplorer, setShowExplorer] = useState(true);
+  const [explorerWidth, setExplorerWidth] = useState(260);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const explorerWidthRef = useRef(explorerWidth);
+  explorerWidthRef.current = explorerWidth;
+
+  const handleExplorerResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = explorerWidthRef.current;
+
+    const onMouseMove = (ev: globalThis.MouseEvent) => {
+      const newWidth = Math.max(160, Math.min(500, startWidth + ev.clientX - startX));
+      setExplorerWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
   const backlinks = selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : [];
@@ -93,201 +119,191 @@ function MainLayout({
 
   return (
     <div className="main-layout">
-      <header className="main-header">
-        <div className="header-left">
-          <h1 className="logo">Gitsidian</h1>
-        </div>
-        <div className="header-right">
-          {/* View mode toggle */}
-          <button
-            className={`view-toggle-btn ${viewMode === 'notes' ? 'active' : ''}`}
-            onClick={() => onSetViewMode('notes')}
-          >
-            📝 Notes
-          </button>
-          <button
-            className={`view-toggle-btn ${viewMode === 'graph' ? 'active' : ''}`}
-            onClick={() => onSetViewMode('graph')}
-          >
-            📊 Graph
-          </button>
-          <div className="header-separator" />
-          <button onClick={() => onShowCreateModal(true)} className="create-btn">
-            ✚ New Note
-          </button>
-          <ThemeSelector />
-          <button onClick={onRefresh} className="refresh-btn" disabled={isLoading}>
-            {isLoading ? 'Loading...' : '↻ Refresh'}
-          </button>
-        </div>
-      </header>
+      <TitleBar
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        showExplorer={showExplorer}
+        onToggleExplorer={() => setShowExplorer((v) => !v)}
+      />
 
       {error && <div className="error-banner">{error}</div>}
-      {isLoadingReadmes && <div className="loading-readmes">⏳ Loading README files...</div>}
+      {isLoadingReadmes && <div className="loading-readmes">⏳ Loading README files…</div>}
 
       <div className="main-content">
-        {viewMode === 'graph' ? (
-          /* GRAPH MODE: full-width graph like before */
-          <div className="graph-container">
-            <GraphView
-              data={graphData}
-              filterOptions={filterOptions}
-              selectedRepo={selectedRepo?.name || null}
-              onSelectNode={onSelectRepo}
-            />
+        {/* LEFT: File Explorer */}
+        <aside
+          className="explorer-sidebar"
+          style={{
+            width: showExplorer ? explorerWidth : 0,
+            minWidth: showExplorer ? explorerWidth : 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div className="explorer-header">
+            <h3>Notes</h3>
+            <span className="explorer-count">{repos.length}</span>
           </div>
-        ) : (
-          /* NOTES MODE: 3-panel Obsidian layout */
-          <>
-            {/* LEFT: File Explorer */}
-            <aside className="explorer-sidebar">
-              <div className="explorer-header">
-                <h3>Notes</h3>
-                <span className="explorer-count">{repos.length}</span>
-              </div>
-              <RepoList
-                repos={repos}
-                readmeContents={readmeContents}
-                selectedRepo={selectedRepo?.name || null}
-                onSelectRepo={onSelectRepo}
-                categoryFilter={categoryFilter}
-                onCategoryFilterChange={onCategoryFilterChange}
-                recommendations={recommendations}
-                onMoveCategory={onMoveCategory}
-              />
-              <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)}>
-                + New Note
-              </button>
-            </aside>
+          <RepoList
+            repos={repos}
+            readmeContents={readmeContents}
+            selectedRepo={selectedRepo?.name || null}
+            onSelectRepo={onSelectRepo}
+            categoryFilter={categoryFilter}
+            onCategoryFilterChange={onCategoryFilterChange}
+            recommendations={recommendations}
+            onMoveCategory={onMoveCategory}
+            searchQuery={searchQuery}
+          />
+          <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)}>
+            + New Note
+          </button>
+        </aside>
 
-            {/* CENTER: Note Viewer/Editor */}
-            <main className="note-main">
-              <TabBar
-                tabs={openTabs}
-                activeTab={selectedRepo?.name || null}
-                onSelectTab={(repoName) => onSelectRepo(repoName)}
-                onCloseTab={onCloseTab}
+        {showExplorer && (
+          <div
+            className="explorer-resize-handle"
+            onMouseDown={handleExplorerResizeStart}
+          />
+        )}
+
+        {/* CENTER: Tabs + Content */}
+        <main className="note-main">
+          <TabBar
+            tabs={openTabs}
+            activeTab={selectedRepo?.name || null}
+            viewMode={viewMode}
+            onSelectTab={(repoName) => onSelectRepo(repoName)}
+            onCloseTab={onCloseTab}
+            onSelectGraph={() => onSetViewMode('graph')}
+          />
+
+          {viewMode === 'graph' ? (
+            <div className="graph-container">
+              <GraphView
+                data={graphData}
+                filterOptions={filterOptions}
+                selectedRepo={selectedRepo?.name || null}
+                onSelectNode={onSelectRepo}
               />
-              {selectedRepo ? (
-                isEditingReadme ? (
-                  <ReadmeEditor
-                    repoName={selectedRepo.name}
-                    repoOwner={selectedRepo.owner.login}
-                    repoNames={repos.map((repo) => repo.name)}
-                    initialContent={selectedReadme}
-                    currentTopics={selectedRepo.topics}
-                    onUpdateTopics={(topics: string[]) => void onUpdateTopics(selectedRepo.name, topics)}
-                    onSave={(content: string) => onReadmeSaved(selectedRepo.name, content)}
-                    onClose={onCloseEditor}
+            </div>
+          ) : selectedRepo ? (
+            isEditingReadme ? (
+              <ReadmeEditor
+                repoName={selectedRepo.name}
+                repoOwner={selectedRepo.owner.login}
+                repoNames={repos.map((repo) => repo.name)}
+                initialContent={selectedReadme}
+                currentTopics={selectedRepo.topics}
+                onUpdateTopics={(topics: string[]) => void onUpdateTopics(selectedRepo.name, topics)}
+                onSave={(content: string) => onReadmeSaved(selectedRepo.name, content)}
+                onClose={onCloseEditor}
+              />
+            ) : (
+              <div className="note-viewer">
+                <div className="note-viewer-header">
+                  <h2>{stripPrefix(selectedRepo.name)}</h2>
+                  <div className="note-viewer-actions">
+                    <a
+                      className="github-link"
+                      href={selectedRepo.html_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      View on GitHub
+                    </a>
+                    <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
+                      ✎ Edit
+                    </button>
+                  </div>
+                </div>
+                {selectedRepo.language || selectedRepo.topics.length > 0 ? (
+                  <div className="note-meta">
+                    {selectedRepo.language && (
+                      <span className="language-badge">{selectedRepo.language}</span>
+                    )}
+                    {selectedRepo.topics.map((topic) => (
+                      <span key={topic} className="topic-tag deletable">
+                        {topic}
+                        <button
+                          className="topic-delete"
+                          onClick={() => void onUpdateTopics(selectedRepo.name, selectedRepo.topics.filter((t) => t !== topic))}
+                          title="Remove topic"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {selectedReadme ? (
+                  <div
+                    className="note-content"
+                    onClick={handleReadmeClick}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedReadme) }}
                   />
                 ) : (
-                  <div className="note-viewer">
-                    <div className="note-viewer-header">
-                      <h2>{stripPrefix(selectedRepo.name)}</h2>
-                      <div className="note-viewer-actions">
-                        <a
-                          className="github-link"
-                          href={selectedRepo.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          View on GitHub
-                        </a>
-                        <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
-                          ✎ Edit
-                        </button>
-                      </div>
-                    </div>
-                    {selectedRepo.language || selectedRepo.topics.length > 0 ? (
-                      <div className="note-meta">
-                        {selectedRepo.language && (
-                          <span className="language-badge">{selectedRepo.language}</span>
-                        )}
-                        {selectedRepo.topics.map((topic) => (
-                          <span key={topic} className="topic-tag deletable">
-                            {topic}
-                            <button
-                              className="topic-delete"
-                              onClick={() => void onUpdateTopics(selectedRepo.name, selectedRepo.topics.filter(t => t !== topic))}
-                              title="Remove topic"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                    {selectedReadme ? (
-                      <div
-                        className="note-content"
-                        onClick={handleReadmeClick}
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedReadme) }}
-                      />
-                    ) : (
-                      <div className="note-empty">
-                        <p>No README yet</p>
-                        <button onClick={() => onEditReadme(true)} className="create-readme-btn">
-                          Create README
-                        </button>
-                      </div>
-                    )}
+                  <div className="note-empty">
+                    <p>No README yet</p>
+                    <button onClick={() => onEditReadme(true)} className="create-readme-btn">
+                      Create README
+                    </button>
                   </div>
-                )
-              ) : (
-                <div className="note-placeholder">
-                  <div className="placeholder-content">
-                    <h2>Gitsidian</h2>
-                    <p>Select a note from the sidebar, or create a new one.</p>
-                    <p className="placeholder-hint">{repos.length} notes available</p>
-                  </div>
-                </div>
-              )}
-            </main>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="note-placeholder">
+              <div className="placeholder-content">
+                <h2>Gitsidian</h2>
+                <p>Select a note from the sidebar, or create a new one.</p>
+                <p className="placeholder-hint">{repos.length} notes available</p>
+              </div>
+            </div>
+          )}
+        </main>
 
-            {/* RIGHT: Backlinks & Outlinks panel */}
-            {selectedRepo && !isEditingReadme && (
-              <aside className="links-sidebar">
-                <div className="links-panel">
-                  <h4>Linked from</h4>
-                  {backlinks.length > 0 ? (
-                    <div className="links-list">
-                      {backlinks.map((backlink) => (
-                        <div
-                          key={backlink.source}
-                          className="link-item"
-                          onClick={() => onSelectRepo(backlink.source)}
-                        >
-                          <span>{stripPrefix(backlink.source)}</span>
-                          {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
-                        </div>
-                      ))}
+        {/* RIGHT: Backlinks & Outlinks */}
+        {viewMode === 'notes' && selectedRepo && !isEditingReadme && (
+          <aside className="links-sidebar">
+            <div className="links-panel">
+              <h4>Linked from</h4>
+              {backlinks.length > 0 ? (
+                <div className="links-list">
+                  {backlinks.map((backlink) => (
+                    <div
+                      key={backlink.source}
+                      className="link-item"
+                      onClick={() => onSelectRepo(backlink.source)}
+                    >
+                      <span>{stripPrefix(backlink.source)}</span>
+                      {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
                     </div>
-                  ) : (
-                    <div className="no-links">No backlinks</div>
-                  )}
+                  ))}
                 </div>
-                <div className="links-panel">
-                  <h4>Links to</h4>
-                  {outlinks.length > 0 ? (
-                    <div className="links-list">
-                      {outlinks.map((outlink) => (
-                        <div
-                          key={`${outlink.target}-${outlink.alias || ''}`}
-                          className="link-item"
-                          onClick={() => onSelectRepo(outlink.target)}
-                        >
-                          <span>{stripPrefix(outlink.target)}</span>
-                          {outlink.alias && <span className="link-alias">as {outlink.alias}</span>}
-                        </div>
-                      ))}
+              ) : (
+                <div className="no-links">No backlinks</div>
+              )}
+            </div>
+            <div className="links-panel">
+              <h4>Links to</h4>
+              {outlinks.length > 0 ? (
+                <div className="links-list">
+                  {outlinks.map((outlink) => (
+                    <div
+                      key={`${outlink.target}-${outlink.alias || ''}`}
+                      className="link-item"
+                      onClick={() => onSelectRepo(outlink.target)}
+                    >
+                      <span>{stripPrefix(outlink.target)}</span>
+                      {outlink.alias && <span className="link-alias">as {outlink.alias}</span>}
                     </div>
-                  ) : (
-                    <div className="no-links">No outgoing links</div>
-                  )}
+                  ))}
                 </div>
-              </aside>
-            )}
-          </>
+              ) : (
+                <div className="no-links">No outgoing links</div>
+              )}
+            </div>
+          </aside>
         )}
       </div>
 
@@ -295,7 +311,7 @@ function MainLayout({
         <CreateRepoModal
           onSubmit={onCreateRepo}
           onClose={() => onShowCreateModal(false)}
-          isLoading={isLoading}
+          isLoading={false}
         />
       )}
     </div>

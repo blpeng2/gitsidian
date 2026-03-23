@@ -11,6 +11,7 @@ interface RepoListProps {
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
   recommendations: Record<string, string>;
   onMoveCategory: (repoName: string, category: NoteCategory) => void;
+  searchQuery: string;
 }
 
 function RepoList({
@@ -22,8 +23,8 @@ function RepoList({
   onCategoryFilterChange,
   recommendations,
   onMoveCategory,
-}: RepoListProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  searchQuery,
+  }: RepoListProps) {
   const [sortBy, setSortBy] = useState<'updated' | 'name' | 'created'>('updated');
   const [collapsedSections, setCollapsedSections] = useState<Record<NoteCategory, boolean>>({
     inbox: false,
@@ -169,13 +170,6 @@ function RepoList({
       <div className="repo-list-header">
         <h3>Repositories ({filteredRepos.length})</h3>
         <div className="repo-list-controls">
-          <input
-            type="text"
-            placeholder="Search repos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="repo-search"
-          />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'updated' | 'name' | 'created')}
