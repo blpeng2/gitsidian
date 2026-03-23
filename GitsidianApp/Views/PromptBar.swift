@@ -2,20 +2,23 @@ import SwiftUI
 
 struct PromptBar: View {
     @Binding var selectedProvider: String
-    @ObservedObject var aiStore: AIPanelWebViewStore
+    let aiStore: AIPanelWebViewStore
 
     var currentProvider: AIProvider {
         AIProvider(rawValue: selectedProvider) ?? .chatgpt
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // Provider selector
             HStack(spacing: 4) {
                 ForEach(AIProvider.allCases) { provider in
-                    Button {
+                Button {
+                    if selectedProvider == provider.rawValue {
+                        aiStore.navigateToURL(provider.url)
+                    } else {
                         selectedProvider = provider.rawValue
-                    } label: {
+                    }
+                } label: {
                         Text("\(provider.icon) \(provider.displayName)")
                             .font(.system(size: 12, weight: selectedProvider == provider.rawValue ? .semibold : .regular))
                             .padding(.horizontal, 8)
@@ -29,15 +32,17 @@ struct PromptBar: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            
+
             Divider()
-            
-            // Preset prompts
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     ForEach(PromptTemplate.presets) { template in
                         Button {
-                            sendPrompt(template)
+                            aiStore.injectPrompt(template.prompt, provider: currentProvider)
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(template.prompt, forType: .string)
                         } label: {
                             Text("\(template.icon) \(template.title)")
                                 .font(.system(size: 11))
@@ -53,23 +58,9 @@ struct PromptBar: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
             }
-            
+
             Divider()
         }
         .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private func sendPrompt(_ template: PromptTemplate) {
-        let provider = currentProvider
-
-        if provider == .perplexity, let url = provider.urlWithPrompt(template.prompt) {
-            aiStore.navigateToURL(url)
-        } else {
-            aiStore.injectPrompt(template.prompt, provider: provider)
-        }
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(template.prompt, forType: .string)
     }
 }
