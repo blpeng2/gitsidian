@@ -94,6 +94,26 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+#root {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.note-content,
+.editor-preview,
+.readme-content,
+.search-result-excerpt,
+.search-result-name {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 *:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
