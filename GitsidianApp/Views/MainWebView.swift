@@ -205,7 +205,7 @@ struct MainWebView: NSViewRepresentable {
 
                 Task {
                     func sendResult(_ id: String, _ success: Bool, _ data: String) {
-                        let js = "window.__ghCallback('\\(id)', \\(success), \\(data))"
+                        let js = "window.__ghCallback('\(id)', \(success), \(data))"
                         Task { @MainActor in
                             _ = try? await weakWebView?.evaluateJavaScript(js)
                         }

@@ -13,6 +13,7 @@ function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
   const [oauthError, setOauthError] = useState('');
   const [ghLoading, setGhLoading] = useState(false);
   const [deviceCode, setDeviceCode] = useState('');
+  const [copied, setCopied] = useState(false);
   const isDesktop = ghCliService.isDesktop();
 
   useEffect(() => {
@@ -91,7 +92,20 @@ function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
             {deviceCode ? (
               <>
                 <p className="login-gh-hint">브라우저에서 이 코드를 입력하세요:</p>
-                <div className="login-device-code">{deviceCode}</div>
+                <div className="login-device-code-row">
+                  <div className="login-device-code">{deviceCode}</div>
+                  <button
+                    className="login-copy-btn"
+                    onClick={() => {
+                      void navigator.clipboard.writeText(deviceCode);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    title="Copy code"
+                  >
+                    {copied ? '✓' : '⎘'}
+                  </button>
+                </div>
                 <p className="login-gh-hint" style={{ fontSize: '0.75rem' }}>
                   github.com/login/device
                 </p>
