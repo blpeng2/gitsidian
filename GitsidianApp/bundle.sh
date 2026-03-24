@@ -46,7 +46,7 @@ if [ -n "$SPARKLE_FW" ]; then
     mkdir -p "$BUNDLE_DIR/Contents/Frameworks"
     cp -R "$SPARKLE_FW" "$BUNDLE_DIR/Contents/Frameworks/"
     install_name_tool -add_rpath "@executable_path/../Frameworks" "$BUNDLE_DIR/Contents/MacOS/GitsidianApp" 2>/dev/null || true
-    codesign --force --sign - "$BUNDLE_DIR/Contents/Frameworks/Sparkle.framework" 2>/dev/null || true
+    codesign --force --deep --sign - "$BUNDLE_DIR/Contents/Frameworks/Sparkle.framework" 2>/dev/null || true
 fi
 
 echo "Signing..."
