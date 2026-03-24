@@ -13,16 +13,18 @@
   "dependencies": {
     "@octokit/rest": "^22.0.1",
     "cytoscape": "^3.33.1",
+    "dompurify": "^3.3.3",
     "katex": "^0.16.40",
     "marked": "^17.0.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/katex": "^0.16.8",
+    "@types/node": "^22.0.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
-    "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
     "@vitejs/plugin-react": "^4.2.0",

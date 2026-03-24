@@ -65,14 +65,17 @@ function getCaretPixelPos(textarea: HTMLTextAreaElement, caretPos: number): { to
 
   const container = textarea.parentElement ?? document.body;
   container.appendChild(mirror);
-  const markerRect = marker.getBoundingClientRect();
-  const containerRect = container.getBoundingClientRect();
-  container.removeChild(mirror);
+  try {
+    const markerRect = marker.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
 
-  return {
-    top: markerRect.top - containerRect.top + textarea.scrollTop + 20,
-    left: Math.min(markerRect.left - containerRect.left, containerRect.width - 220),
-  };
+    return {
+      top: markerRect.top - containerRect.top + textarea.scrollTop + 20,
+      left: Math.min(markerRect.left - containerRect.left, containerRect.width - 220),
+    };
+  } finally {
+    container.removeChild(mirror);
+  }
 }
 
 interface ReadmeEditorProps {
@@ -745,6 +748,8 @@ function ReadmeEditor({
               const textBefore = newValue.substring(0, cursor);
 
               const wikiMatch = /\[\[([^\][\n]*)$/.exec(textBefore);
+              const slashMatch = /(?:^|\n)(\/([a-z]*))$/.exec(textBefore);
+
               if (wikiMatch) {
                 const insertStart = cursor - wikiMatch[0].length;
                 wikiInsertPosRef.current = insertStart;
@@ -755,13 +760,11 @@ function ReadmeEditor({
                   const pos = getCaretPixelPos(e.target, insertStart);
                   setOverlayPos(pos);
                 }
-              } else if (showInlineWikiPicker) {
-                setShowInlineWikiPicker(false);
-                setInlineWikiSearch('');
-              }
-
-              const slashMatch = /(?:^|\n)(\/([a-z]*))$/.exec(textBefore);
-              if (slashMatch) {
+                if (showSlashMenu) {
+                  setShowSlashMenu(false);
+                  setSlashSearch('');
+                }
+              } else if (slashMatch) {
                 const insertStart = cursor - slashMatch[1].length;
                 slashInsertPosRef.current = insertStart;
                 setSlashSearch(slashMatch[2]);
@@ -771,9 +774,19 @@ function ReadmeEditor({
                   const pos = getCaretPixelPos(e.target, insertStart);
                   setOverlayPos(pos);
                 }
-              } else if (showSlashMenu) {
-                setShowSlashMenu(false);
-                setSlashSearch('');
+                if (showInlineWikiPicker) {
+                  setShowInlineWikiPicker(false);
+                  setInlineWikiSearch('');
+                }
+              } else {
+                if (showInlineWikiPicker) {
+                  setShowInlineWikiPicker(false);
+                  setInlineWikiSearch('');
+                }
+                if (showSlashMenu) {
+                  setShowSlashMenu(false);
+                  setSlashSearch('');
+                }
               }
             }}
             onKeyDown={handleKeyDown}
@@ -805,6 +818,10 @@ function ReadmeEditor({
             onFocus={() => {
               setShowWikiPicker(false);
               setShowTopicPicker(false);
+              setShowInlineWikiPicker(false);
+              setInlineWikiSearch('');
+              setShowSlashMenu(false);
+              setSlashSearch('');
             }}
             placeholder="Write your note in Markdown...&#10;&#10;Use [[repo-name]] to link to other notes."
             spellCheck={false}

@@ -5,27 +5,43 @@ const STORAGE_KEYS = {
 
 class StorageService {
   getAccessToken(): string | null {
-    return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    try {
+      return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    } catch {
+      return null;
+    }
   }
 
   setAccessToken(token: string): void {
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+    try {
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+    } catch {}
   }
 
   removeAccessToken(): void {
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    } catch {}
   }
 
   getDraft(repoName: string): string | null {
-    return localStorage.getItem(STORAGE_KEYS.DRAFT_PREFIX + repoName);
+    try {
+      return localStorage.getItem(STORAGE_KEYS.DRAFT_PREFIX + repoName);
+    } catch {
+      return null;
+    }
   }
 
   setDraft(repoName: string, content: string): void {
-    localStorage.setItem(STORAGE_KEYS.DRAFT_PREFIX + repoName, content);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DRAFT_PREFIX + repoName, content);
+    } catch {}
   }
 
   removeDraft(repoName: string): void {
-    localStorage.removeItem(STORAGE_KEYS.DRAFT_PREFIX + repoName);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.DRAFT_PREFIX + repoName);
+    } catch {}
   }
 }
 

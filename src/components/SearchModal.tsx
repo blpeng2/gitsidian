@@ -9,6 +9,28 @@ interface SearchModalProps {
   onClose: () => void;
 }
 
+const MATCH_LABELS: Record<string, string> = {
+  name: 'Name',
+  description: 'Desc',
+  topic: 'Topic',
+  content: 'README',
+};
+
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const lower = text.toLowerCase();
+  const q = query.toLowerCase().trim();
+  const idx = lower.indexOf(q);
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="search-highlight">{text.slice(idx, idx + q.length)}</mark>
+      {text.slice(idx + q.length)}
+    </>
+  );
+}
+
 function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -47,29 +69,6 @@ function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchMod
     const item = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
     item?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
-
-  const MATCH_LABELS: Record<string, string> = {
-    name: 'Name',
-    description: 'Desc',
-    topic: 'Topic',
-    content: 'README',
-  };
-
-  // Highlight query in text
-  function highlightText(text: string, query: string): React.ReactNode {
-    if (!query.trim()) return text;
-    const lower = text.toLowerCase();
-    const q = query.toLowerCase().trim();
-    const idx = lower.indexOf(q);
-    if (idx === -1) return text;
-    return (
-      <>
-        {text.slice(0, idx)}
-        <mark className="search-highlight">{text.slice(idx, idx + q.length)}</mark>
-        {text.slice(idx + q.length)}
-      </>
-    );
-  }
 
   return (
     <div className="search-modal-overlay" onClick={onClose}>

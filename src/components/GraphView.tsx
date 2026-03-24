@@ -37,6 +37,11 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
     y: number;
     nodeId: string | null;
   }>({ visible: false, x: 0, y: 0, nodeId: null });
+  const onSelectNodeRef = useRef(onSelectNode);
+
+  useEffect(() => {
+    onSelectNodeRef.current = onSelectNode;
+  }, [onSelectNode]);
 
   const closeContextMenu = useCallback(() => {
     setContextMenu({ visible: false, x: 0, y: 0, nodeId: null });
@@ -197,12 +202,12 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
     // Event handlers
     cy.on('tap', 'node', (evt) => {
       const node = evt.target;
-      onSelectNode(node.data('id'));
+      onSelectNodeRef.current(node.data('id'));
     });
 
     cy.on('tap', (evt) => {
       if (evt.target === cy) {
-        onSelectNode(null);
+        onSelectNodeRef.current(null);
       }
       closeContextMenu();
     });

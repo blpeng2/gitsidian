@@ -25,7 +25,13 @@ class GhCliService {
   private send(action: string): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = Math.random().toString(36).slice(2, 10);
+      const timer = setTimeout(() => {
+        this.callbacks.delete(id);
+        reject(new Error(`gh bridge timeout: ${action}`));
+      }, 30000);
+
       this.callbacks.set(id, (success, data) => {
+        clearTimeout(timer);
         if (success) resolve(data);
         else reject(new Error(typeof data === 'string' ? data : 'gh error'));
       });

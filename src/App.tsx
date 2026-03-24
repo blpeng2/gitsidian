@@ -120,7 +120,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         showCreateModal: action.payload,
       };
     case 'SET_SHOW_SEARCH_MODAL':
-      return { ...state, showCreateModal: false, showSearchModal: action.payload };
+      return { ...state, showSearchModal: action.payload };
     case 'SET_EDITING_README':
       return {
         ...state,
@@ -243,7 +243,7 @@ function App() {
             });
           }
         }
-      });
+      }).catch(() => {});
       return;
     }
 
@@ -341,7 +341,7 @@ function App() {
     dispatch({ type: 'SET_EDITING_README', payload: false });
   };
 
-  const handleUpdateTopics = async (repoName: string, topics: string[]) => {
+  const handleUpdateTopics = useCallback(async (repoName: string, topics: string[]) => {
     try {
       const repo = state.repos.find((r) => r.name === repoName);
       if (!repo) return;
@@ -354,9 +354,9 @@ function App() {
         payload: error instanceof Error ? error.message : 'Failed to update topics',
       });
     }
-  };
+  }, [state.repos]);
 
-  const handleMoveCategory = async (repoName: string, category: NoteCategory) => {
+  const handleMoveCategory = useCallback(async (repoName: string, category: NoteCategory) => {
     try {
       const repo = state.repos.find((r) => r.name === repoName);
       if (!repo) {
@@ -372,7 +372,7 @@ function App() {
         payload: error instanceof Error ? error.message : 'Failed to move category',
       });
     }
-  };
+  }, [state.repos]);
 
   const graphData = useMemo(
     () => generateGraphData(state.repos, state.readmeContents),

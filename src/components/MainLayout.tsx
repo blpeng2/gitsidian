@@ -1,4 +1,4 @@
-import { type MouseEvent, useState, useRef, useCallback } from 'react';
+import { type MouseEvent, useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { FilterOptions, GitHubRepo, GraphData, NoteCategory } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
@@ -79,7 +79,14 @@ function MainLayout({
   const [searchQuery, setSearchQuery] = useState('');
 
   const explorerWidthRef = useRef(explorerWidth);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   explorerWidthRef.current = explorerWidth;
+
+  useEffect(() => {
+    return () => {
+      resizeCleanupRef.current?.();
+    };
+  }, []);
 
   const handleExplorerResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -94,6 +101,7 @@ function MainLayout({
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseup', onMouseUp);
+      resizeCleanupRef.current = null;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
@@ -102,13 +110,25 @@ function MainLayout({
     document.body.style.userSelect = 'none';
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    resizeCleanupRef.current = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
   }, []);
 
   const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
-  const backlinks = selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : [];
-  const outlinks = selectedRepo
-    ? getOutlinks(selectedRepo.name, readmeContents, new Set(repos.map((repo) => repo.name)))
-    : [];
+  const backlinks = useMemo(
+    () => (selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : []),
+    [selectedRepo?.name, readmeContents]
+  );
+  const outlinks = useMemo(
+    () => (selectedRepo
+      ? getOutlinks(selectedRepo.name, readmeContents, new Set(repos.map((repo) => repo.name)))
+      : []),
+    [selectedRepo?.name, readmeContents, repos]
+  );
 
   const handleReadmeClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
