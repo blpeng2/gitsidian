@@ -260,6 +260,20 @@ struct MainWebView: NSViewRepresentable {
                             }
                             sendResult(callId, true, "true")
 
+                        case "performUpdate":
+                            let args = body["args"] as? [String] ?? []
+                            let dlUrl = args.first ?? ""
+                            let weakWV = self.webView
+                            Task {
+                                await UpdateChecker.shared.performUpdate(downloadUrl: dlUrl) { status in
+                                    let js = "window.dispatchEvent(new CustomEvent('updateProgress',{detail:{status:'\(status)'}}))"
+                                    DispatchQueue.main.async {
+                                        weakWV?.evaluateJavaScript(js) { _, _ in }
+                                    }
+                                }
+                            }
+                            // performUpdate는 앱을 종료하므로 sendResult 불필요
+
                         case "isAvailable":
                             let available = await GhService.shared.isAvailable
                             sendResult(callId, true, available ? "true" : "false")

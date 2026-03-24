@@ -7,7 +7,7 @@ declare global {
 }
 
 interface GhCliHandler {
-  postMessage: (msg: { id: string; action: string }) => void;
+  postMessage: (msg: { id: string; action: string; args?: string[] }) => void;
 }
 
 class GhCliService {
@@ -79,6 +79,13 @@ class GhCliService {
         return;
     }
     await this.send('openExternal', [url]);
+  }
+
+  async performUpdate(downloadUrl: string): Promise<void> {
+    if (!this.isDesktop()) return;
+    const id = Math.random().toString(36).slice(2, 10);
+    const ghCliHandler = (window.webkit?.messageHandlers as { ghCli?: GhCliHandler } | undefined)?.ghCli;
+    ghCliHandler?.postMessage({ id, action: 'performUpdate', args: [downloadUrl] });
   }
 }
 

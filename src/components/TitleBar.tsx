@@ -23,6 +23,7 @@ interface TitleBarProps {
 function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer }: TitleBarProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<{ version: string; downloadUrl: string; releaseUrl: string } | null>(null);
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'downloading' | 'installing' | 'restarting' | 'error'>('idle');
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -31,6 +32,17 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
     };
     window.addEventListener('updateAvailable', handler);
     return () => window.removeEventListener('updateAvailable', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { status } = (e as CustomEvent<{ status: string }>).detail;
+      if (status === 'downloading' || status === 'installing' || status === 'restarting' || status === 'error') {
+        setUpdateStatus(status as 'downloading' | 'installing' | 'restarting' | 'error');
+      }
+    };
+    window.addEventListener('updateProgress', handler);
+    return () => window.removeEventListener('updateProgress', handler);
   }, []);
 
   return (
@@ -67,11 +79,21 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
         </button>
         {updateInfo && (
           <button
-            className="title-bar-update-badge"
-            onClick={() => void ghCliService.openExternal(updateInfo.downloadUrl)}
-            title={`v${updateInfo.version} available — click to download`}
+            className={`title-bar-update-badge ${updateStatus !== 'idle' && updateStatus !== 'error' ? 'updating' : ''}`}
+            onClick={() => {
+              if (updateStatus === 'idle' || updateStatus === 'error') {
+                setUpdateStatus('downloading');
+                void ghCliService.performUpdate(updateInfo.downloadUrl);
+              }
+            }}
+            disabled={updateStatus !== 'idle' && updateStatus !== 'error'}
+            title={updateStatus === 'idle' ? `Update to v${updateInfo.version}` : undefined}
           >
-            ↑ {updateInfo.version}
+            {updateStatus === 'idle' && `↑ ${updateInfo.version}`}
+            {updateStatus === 'downloading' && '↓ Downloading…'}
+            {updateStatus === 'installing' && '⚙ Installing…'}
+            {updateStatus === 'restarting' && '↺ Restarting…'}
+            {updateStatus === 'error' && '⚠ Retry'}
           </button>
         )}
       </div>

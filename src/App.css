@@ -2274,6 +2274,17 @@ textarea {
   background: rgba(63, 185, 80, 0.22);
 }
 
+.title-bar-update-badge.updating {
+  opacity: 0.7;
+  cursor: default;
+  pointer-events: none;
+}
+
+.title-bar-update-badge:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 /* ========================================
    Settings Modal
    ======================================== */
