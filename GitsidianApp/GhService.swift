@@ -131,8 +131,49 @@ actor GhService {
     }
 
     func login() async throws {
-        let (code, _, stderr) = try await run(["auth", "login", "--web", "--hostname", "github.com"])
-        guard code == 0 else { throw GhError.commandFailed(code, stderr) }
+        guard let path = ghPath else { throw GhError.notFound }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: path)
+                    process.arguments = ["auth", "login", "--web", "--hostname", "github.com"]
+
+                    var env = ProcessInfo.processInfo.environment
+                    env["HOME"] = NSHomeDirectory()
+                    // macOS의 open 명령으로 브라우저 열기
+                    env["BROWSER"] = "open"
+                    process.environment = env
+
+                    let stdoutPipe = Pipe()
+                    let stderrPipe = Pipe()
+                    let stdinPipe = Pipe()
+                    process.standardOutput = stdoutPipe
+                    process.standardError = stderrPipe
+                    process.standardInput = stdinPipe
+
+                    try process.run()
+
+                    // gh가 "Press Enter to open..." 출력 후 stdin 대기 → 1초 후 Enter 전송
+                    Thread.sleep(forTimeInterval: 1.0)
+                    stdinPipe.fileHandleForWriting.write(Data("\n".utf8))
+                    stdinPipe.fileHandleForWriting.closeFile()
+
+                    process.waitUntilExit()
+
+                    if process.terminationStatus == 0 {
+                        continuation.resume()
+                    } else {
+                        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+                        continuation.resume(throwing: GhError.commandFailed(process.terminationStatus, stdout + stderr))
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     var isAvailable: Bool { ghPath != nil }
