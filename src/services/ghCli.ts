@@ -22,16 +22,16 @@ class GhCliService {
     };
   }
 
-  private send(action: string, args?: string[]): Promise<unknown> {
+  private send(action: string, args?: string[], timeoutMs = 30_000): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = Math.random().toString(36).slice(2, 10);
-      const timer = setTimeout(() => {
+      const timer = timeoutMs > 0 ? setTimeout(() => {
         this.callbacks.delete(id);
         reject(new Error(`gh bridge timeout: ${action}`));
-      }, 30000);
+      }, timeoutMs) : null;
 
       this.callbacks.set(id, (success, data) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (success) resolve(data);
         else reject(new Error(typeof data === 'string' ? data : 'gh error'));
       });
@@ -64,7 +64,7 @@ class GhCliService {
   }
 
   async login(): Promise<void> {
-    await this.send('login');
+    await this.send('login', undefined, 10 * 60 * 1000);
   }
 
   async getToken(): Promise<string> {
@@ -81,12 +81,6 @@ class GhCliService {
     await this.send('openExternal', [url]);
   }
 
-  async performUpdate(downloadUrl: string): Promise<void> {
-    if (!this.isDesktop()) return;
-    const id = Math.random().toString(36).slice(2, 10);
-    const ghCliHandler = (window.webkit?.messageHandlers as { ghCli?: GhCliHandler } | undefined)?.ghCli;
-    ghCliHandler?.postMessage({ id, action: 'performUpdate', args: [downloadUrl] });
-  }
 }
 
 export const ghCliService = new GhCliService();

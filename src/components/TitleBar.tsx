@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { ghCliService } from '../services/ghCli';
+import { useState } from 'react';
 import SettingsModal from './SettingsModal';
 import { IconSidebarClose, IconSidebarOpen, IconSettings, IconAI } from './Icons';
 
@@ -22,28 +21,6 @@ interface TitleBarProps {
 
 function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer }: TitleBarProps) {
   const [showSettings, setShowSettings] = useState(false);
-  const [updateInfo, setUpdateInfo] = useState<{ version: string; downloadUrl: string; releaseUrl: string } | null>(null);
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'downloading' | 'installing' | 'restarting' | 'error'>('idle');
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { version, downloadUrl, releaseUrl } = (e as CustomEvent).detail;
-      setUpdateInfo({ version, downloadUrl, releaseUrl });
-    };
-    window.addEventListener('updateAvailable', handler);
-    return () => window.removeEventListener('updateAvailable', handler);
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { status } = (e as CustomEvent<{ status: string }>).detail;
-      if (status === 'downloading' || status === 'installing' || status === 'restarting' || status === 'error') {
-        setUpdateStatus(status as 'downloading' | 'installing' | 'restarting' | 'error');
-      }
-    };
-    window.addEventListener('updateProgress', handler);
-    return () => window.removeEventListener('updateProgress', handler);
-  }, []);
 
   return (
     <>
@@ -77,25 +54,6 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
         >
           <IconAI />
         </button>
-        {updateInfo && (
-          <button
-            className={`title-bar-update-badge ${updateStatus !== 'idle' && updateStatus !== 'error' ? 'updating' : ''}`}
-            onClick={() => {
-              if (updateStatus === 'idle' || updateStatus === 'error') {
-                setUpdateStatus('downloading');
-                void ghCliService.performUpdate(updateInfo.downloadUrl);
-              }
-            }}
-            disabled={updateStatus !== 'idle' && updateStatus !== 'error'}
-            title={updateStatus === 'idle' ? `Update to v${updateInfo.version}` : undefined}
-          >
-            {updateStatus === 'idle' && `↑ ${updateInfo.version}`}
-            {updateStatus === 'downloading' && '↓ Downloading…'}
-            {updateStatus === 'installing' && '⚙ Installing…'}
-            {updateStatus === 'restarting' && '↺ Restarting…'}
-            {updateStatus === 'error' && '⚠ Retry'}
-          </button>
-        )}
       </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>

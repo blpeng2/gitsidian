@@ -1,6 +1,18 @@
 import SwiftUI
 import WebKit
 
+private final class GitsidianWebView: WKWebView {
+    var isInDragRegion = false
+    override var mouseDownCanMoveWindow: Bool { isInDragRegion }
+    override func mouseDown(with event: NSEvent) {
+        if isInDragRegion {
+            window?.performDrag(with: event)
+        } else {
+            super.mouseDown(with: event)
+        }
+    }
+}
+
 struct MainWebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
@@ -10,6 +22,40 @@ struct MainWebView: NSViewRepresentable {
             WeakScriptMessageHandler(delegate: context.coordinator),
             name: "ghCli"
         )
+        config.userContentController.add(
+            WeakScriptMessageHandler(delegate: context.coordinator),
+            name: "dragRegion"
+        )
+        let dragScript = WKUserScript(
+            source: """
+            (function() {
+                let _inDrag = false;
+                document.addEventListener('mousemove', function(e) {
+                    const el = document.elementFromPoint(e.clientX, e.clientY);
+                    let inDrag = false;
+                    let node = el;
+                    while (node && node !== document.body) {
+                        const cl = node.classList;
+                        if (cl) {
+                            if (cl.contains('title-bar-btn') ||
+                                cl.contains('title-bar-search') ||
+                                cl.contains('title-bar-traffic') ||
+                                cl.contains('title-bar-update-badge')) { inDrag = false; break; }
+                            if (cl.contains('title-bar')) { inDrag = true; break; }
+                        }
+                        node = node.parentElement;
+                    }
+                    if (inDrag !== _inDrag) {
+                        _inDrag = inDrag;
+                        window.webkit?.messageHandlers?.dragRegion?.postMessage(inDrag);
+                    }
+                }, { passive: true, capture: true });
+            })();
+            """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(dragScript)
 
         // macOS 26에서 제거된 private WKPreferences KVC 키들을 대체:
         //   developerExtrasEnabled → webView.isInspectable = true
@@ -19,7 +65,7 @@ struct MainWebView: NSViewRepresentable {
             context.coordinator.hasWebResources = true
         }
 
-        let webView = WKWebView(frame: .zero, configuration: config)
+        let webView = GitsidianWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = true  // 'developerExtrasEnabled' KVC 대체 (macOS 13.3+)
@@ -33,18 +79,6 @@ struct MainWebView: NSViewRepresentable {
             let isAvailable = await GhService.shared.isAvailable
             await MainActor.run {
                 webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('ghReady', { detail: { available: \(isAvailable) } }))")
-            }
-        }
-
-        Task { [weak webViewRef = webView] in
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            guard let info = await UpdateChecker.shared.check() else { return }
-            let version = info.version
-            let dlUrl   = info.downloadUrl.replacingOccurrences(of: "'", with: "\\'")
-            let relUrl  = info.releaseUrl.replacingOccurrences(of: "'", with: "\\'")
-            let js = "window.dispatchEvent(new CustomEvent('updateAvailable',{detail:{version:'\(version)',downloadUrl:'\(dlUrl)',releaseUrl:'\(relUrl)'}}))"
-            DispatchQueue.main.async {
-                webViewRef?.evaluateJavaScript(js) { _, _ in }
             }
         }
 
@@ -204,6 +238,14 @@ struct MainWebView: NSViewRepresentable {
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "dragRegion",
+               let isDrag = message.body as? Bool,
+               let gView = webView as? GitsidianWebView {
+                DispatchQueue.main.async {
+                    gView.isInDragRegion = isDrag
+                }
+            }
+
             if message.name == "toggleAIPanel" {
                 NotificationCenter.default.post(name: .toggleAIPanel, object: nil)
             }
@@ -259,20 +301,6 @@ struct MainWebView: NSViewRepresentable {
                                 }
                             }
                             sendResult(callId, true, "true")
-
-                        case "performUpdate":
-                            let args = body["args"] as? [String] ?? []
-                            let dlUrl = args.first ?? ""
-                            let weakWV = self.webView
-                            Task {
-                                await UpdateChecker.shared.performUpdate(downloadUrl: dlUrl) { status in
-                                    let js = "window.dispatchEvent(new CustomEvent('updateProgress',{detail:{status:'\(status)'}}))"
-                                    DispatchQueue.main.async {
-                                        weakWV?.evaluateJavaScript(js) { _, _ in }
-                                    }
-                                }
-                            }
-                            // performUpdate는 앱을 종료하므로 sendResult 불필요
 
                         case "isAvailable":
                             let available = await GhService.shared.isAvailable

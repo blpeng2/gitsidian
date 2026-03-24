@@ -13,6 +13,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -110,7 +112,77 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent Gitsidian.app Gitsidian-macOS-x86_64.zip
           hdiutil create -volname "Gitsidian" -srcfolder Gitsidian.app -ov -format UDZO Gitsidian-macOS-x86_64.dmg
           rm -rf "$BUNDLE_DIR"
-      
+
+      - name: Sign archives and update appcast
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Download Sparkle CLI tools
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/2.6.4/Sparkle-2.6.4.tar.xz" \
+            -o sparkle.tar.xz
+          tar -xJf sparkle.tar.xz
+          SIGN_UPDATE=$(find . -name "sign_update" -maxdepth 4 2>/dev/null | head -1)
+          chmod +x "$SIGN_UPDATE"
+
+          # Write private key
+          echo "$SPARKLE_PRIVATE_KEY" > /tmp/sparkle_priv.pem
+          chmod 600 /tmp/sparkle_priv.pem
+
+          ARM64_FILE="GitsidianApp/Gitsidian-macOS-arm64.zip"
+          X86_FILE="GitsidianApp/Gitsidian-macOS-x86_64.zip"
+
+          ARM64_SIG=$("$SIGN_UPDATE" "$ARM64_FILE" -f /tmp/sparkle_priv.pem)
+          X86_SIG=$("$SIGN_UPDATE"  "$X86_FILE"  -f /tmp/sparkle_priv.pem)
+          ARM64_SIZE=$(stat -f%z "$ARM64_FILE")
+          X86_SIZE=$(stat  -f%z "$X86_FILE")
+          rm -f /tmp/sparkle_priv.pem
+
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          DATE=$(date -R)
+
+          mkdir -p public
+          cat > public/appcast.xml <<APPCAST
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+              <channel>
+                  <title>Gitsidian</title>
+                  <link>https://blpeng2.github.io/gitsidian/appcast.xml</link>
+                  <description>Gitsidian Updates</description>
+                  <language>en</language>
+                  <item>
+                      <title>Gitsidian ${VERSION}</title>
+                      <pubDate>${DATE}</pubDate>
+                      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+                      <enclosure
+                          url="https://github.com/blpeng2/gitsidian/releases/download/v${VERSION}/Gitsidian-macOS-arm64.zip"
+                          sparkle:version="${VERSION}"
+                          sparkle:edSignature="${ARM64_SIG}"
+                          length="${ARM64_SIZE}"
+                          type="application/zip"
+                          sparkle:os="macos"
+                          sparkle:arch="arm64" />
+                      <enclosure
+                          url="https://github.com/blpeng2/gitsidian/releases/download/v${VERSION}/Gitsidian-macOS-x86_64.zip"
+                          sparkle:version="${VERSION}"
+                          sparkle:edSignature="${X86_SIG}"
+                          length="${X86_SIZE}"
+                          type="application/zip"
+                          sparkle:os="macos"
+                          sparkle:arch="x86_64" />
+                  </item>
+              </channel>
+          </rss>
+          APPCAST
+
+          # Commit appcast to main (triggers deploy.yml → GitHub Pages update)
+          git config user.email "github-actions@github.com"
+          git config user.name "GitHub Actions"
+          git remote set-url origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git add public/appcast.xml
+          git diff --cached --quiet || git commit -m "chore: update appcast for v${VERSION}"
+          git push origin HEAD:main
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

@@ -1,5 +1,10 @@
 import SwiftUI
 import AppKit
+import Sparkle
+
+private final class DraggableHostingView: NSHostingView<ContentView> {
+    override var mouseDownCanMoveWindow: Bool { true }
+}
 
 @main
 struct GitsidianApp: App {
@@ -16,8 +21,14 @@ struct GitsidianApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var mainWindow: NSWindow?
+    private var updaterController: SPUStandardUpdaterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
         showMainWindow()
         setupMenuCommands()
     }
@@ -65,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // applicationDidFinishLaunching 중 동기 SwiftUI 레이아웃이 일어나지 않도록 함.
         DispatchQueue.main.async { [weak window] in
             guard let window else { return }
-            let hostingView = NSHostingView(rootView: ContentView())
+            let hostingView = DraggableHostingView(rootView: ContentView())
             window.contentView = hostingView
         }
     }
@@ -91,6 +102,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupMenuCommands() {
         guard let mainMenu = NSApp.mainMenu else { return }
+
+        if let appMenu = mainMenu.items.first?.submenu {
+            let updateItem = NSMenuItem(
+                title: "Check for Updates\u{2026}",
+                action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+                keyEquivalent: ""
+            )
+            updateItem.target = updaterController
+            appMenu.insertItem(updateItem, at: 1)
+            appMenu.insertItem(.separator(), at: 2)
+        }
 
         // File > New Note
         if let fileMenu = mainMenu.item(withTitle: "File")?.submenu {
