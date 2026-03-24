@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { AppAction, AppState, FilterOptions, NoteCategory } from './types';
 import { githubService } from './services/github';
+import { ghCliService } from './services/ghCli';
 import { storageService } from './services/storage';
 import { getBacklinks, generateGraphData } from './utils/wikiLinks';
 import { getCategoryIcon, getCategoryLabel, getRecommendations, setCategoryTopics } from './utils/categoryRules';
@@ -220,6 +221,32 @@ function App() {
       return;
     }
 
+    if (ghCliService.isDesktop()) {
+      ghCliService.checkAuth().then(async (authenticated) => {
+        if (authenticated) {
+          try {
+            const token = await ghCliService.getToken();
+            githubService.setAccessToken(token);
+            githubService.validateToken().then((valid) => {
+              if (valid) {
+                dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
+              } else {
+                dispatch({ type: 'SET_ERROR', payload: 'GitHub 인증이 만료되었습니다. 다시 로그인해주세요.' });
+              }
+            }).catch(() => {
+              dispatch({ type: 'SET_ERROR', payload: 'GitHub 토큰 검증에 실패했습니다. 다시 로그인해주세요.' });
+            });
+          } catch (error) {
+            dispatch({
+              type: 'SET_ERROR',
+              payload: error instanceof Error ? error.message : '토큰을 가져올 수 없습니다',
+            });
+          }
+        }
+      });
+      return;
+    }
+
     const savedToken = storageService.getAccessToken();
     const envToken = import.meta.env.VITE_GITHUB_TOKEN;
     const tokenToUse = savedToken ?? envToken ?? null;
@@ -383,6 +410,19 @@ function App() {
       <LoginScreen
         isLoading={state.isLoading}
         error={state.error}
+        onGhLogin={async () => {
+          dispatch({ type: 'SET_LOADING', payload: true });
+          try {
+            await ghCliService.login();
+            const token = await ghCliService.getToken();
+            githubService.setAccessToken(token);
+            dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
+          } catch (err) {
+            dispatch({ type: 'SET_ERROR', payload: err instanceof Error ? err.message : '로그인에 실패했습니다.' });
+          } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }
+        }}
       />
     );
   }

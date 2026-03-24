@@ -6,6 +6,10 @@ struct MainWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(WeakScriptMessageHandler(delegate: context.coordinator), name: "toggleAIPanel")
+        config.userContentController.add(
+            WeakScriptMessageHandler(delegate: context.coordinator),
+            name: "ghCli"
+        )
 
         // macOS 26에서 제거된 private WKPreferences KVC 키들을 대체:
         //   developerExtrasEnabled → webView.isInspectable = true
@@ -22,6 +26,15 @@ struct MainWebView: NSViewRepresentable {
 
         loadContent(webView, devMode: false, hasResources: context.coordinator.hasWebResources)
         setupNotificationObservers(webView, context: context)
+        context.coordinator.webView = webView
+
+        Task {
+            await GhService.shared.setup()
+            let isAvailable = await GhService.shared.isAvailable
+            await MainActor.run {
+                webView.evaluateJavaScript("window.dispatchEvent(new CustomEvent('ghReady', { detail: { available: \(isAvailable) } }))")
+            }
+        }
 
         return webView
     }
@@ -143,6 +156,7 @@ struct MainWebView: NSViewRepresentable {
         var devMode = false
         var hasWebResources = false
         var observers: [Any] = []
+        weak var webView: WKWebView?
 
         deinit {
             observers.forEach { NotificationCenter.default.removeObserver($0) }
@@ -180,6 +194,56 @@ struct MainWebView: NSViewRepresentable {
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "toggleAIPanel" {
                 NotificationCenter.default.post(name: .toggleAIPanel, object: nil)
+            }
+
+            if message.name == "ghCli" {
+                guard let body = message.body as? [String: Any],
+                      let callId = body["id"] as? String,
+                      let action = body["action"] as? String else { return }
+
+                let weakWebView = self.webView
+
+                Task {
+                    func sendResult(_ id: String, _ success: Bool, _ data: String) {
+                        let js = "window.__ghCallback('\\(id)', \\(success), \\(data))"
+                        Task { @MainActor in
+                            _ = try? await weakWebView?.evaluateJavaScript(js)
+                        }
+                    }
+
+                    do {
+                        switch action {
+                        case "checkAuth":
+                            let ok = await GhService.shared.isAuthenticated()
+                            sendResult(callId, ok, ok ? "true" : "null")
+
+                        case "login":
+                            try await GhService.shared.login()
+                            sendResult(callId, true, "true")
+
+                        case "getToken":
+                            let token = try await GhService.shared.getToken()
+                            let escaped = token.replacingOccurrences(of: "\"", with: "\\\"")
+                            sendResult(callId, true, "\"\(escaped)\"")
+
+                        case "isAvailable":
+                            let available = await GhService.shared.isAvailable
+                            sendResult(callId, true, available ? "true" : "false")
+
+                        default:
+                            sendResult(callId, false, "\"Unknown action: \(action)\"")
+                        }
+                    } catch GhError.notFound {
+                        sendResult(callId, false, "\"gh not found\"")
+                    } catch GhError.commandFailed(let code, let stderr) {
+                        let escaped = stderr.replacingOccurrences(of: "\"", with: "\\\"")
+                            .replacingOccurrences(of: "\n", with: "\\n")
+                        sendResult(callId, false, "\"exit \(code): \(escaped)\"")
+                    } catch {
+                        let escaped = error.localizedDescription.replacingOccurrences(of: "\"", with: "\\\"")
+                        sendResult(callId, false, "\"\(escaped)\"")
+                    }
+                }
             }
         }
     }
