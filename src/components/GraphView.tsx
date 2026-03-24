@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import cytoscape, { Core, EdgeSingular, NodeSingular } from 'cytoscape';
 import { GraphData, FilterOptions } from '../types';
-
+import { IconFitView, IconRelayout, IconLocalGraph, IconGlobalGraph } from './Icons';
 interface GraphViewProps {
   data: GraphData;
   filterOptions: FilterOptions;
@@ -502,17 +502,18 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
   return (
     <div className="graph-view">
       <div className="graph-controls">
-        <button onClick={handleFit} title="Fit to view">⊞</button>
-        <button onClick={handleCenter} title="Center">⊕</button>
+        <button onClick={handleFit} title="Fit to view"><IconFitView /></button>
+        <button onClick={handleCenter} title="Center" style={{fontSize: '18px'}}>⌖</button>
         <button onClick={handleRelayout} title="Re-layout">
-          ↺
+          <IconRelayout />
         </button>
         <button
           onClick={() => setLocalMode(prev => !prev)}
           title={localMode ? 'Show all repos' : 'Local graph mode'}
           className={localMode ? 'active' : ''}
+          style={{display: 'flex', alignItems: 'center', gap: '6px', padding: '0 10px', width: 'auto'}}
         >
-          {localMode ? '🔍 Local' : '🌐 Global'}
+          {localMode ? <><IconLocalGraph /> Local</> : <><IconGlobalGraph /> Global</>}
         </button>
       </div>
       <div className="graph-search">

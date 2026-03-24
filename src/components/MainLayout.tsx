@@ -8,16 +8,20 @@ import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
 import TabBar from './TabBar';
 import TitleBar from './TitleBar';
-
+import SearchModal from './SearchModal';
+import { IconLoading, IconPlus, IconEdit } from './Icons';
 interface MainLayoutProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
   selectedRepo: GitHubRepo | null;
   graphData: GraphData;
   filterOptions: FilterOptions;
+  isLoading: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
   showCreateModal: boolean;
+  showSearchModal: boolean;
+  onShowSearchModal: (show: boolean) => void;
   isEditingReadme: boolean;
   viewMode: 'notes' | 'graph';
   openTabs: string[];
@@ -26,7 +30,7 @@ interface MainLayoutProps {
   onSelectRepo: (repoName: string | null) => void;
   onCloseTab: (repoName: string) => void;
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
-  onUpdateFilters: (options: Partial<FilterOptions>) => void;
+  onDismissError: () => void;
   onLogout: () => void;
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
   onReadmeSaved: (repoName: string, content: string) => void;
@@ -44,9 +48,12 @@ function MainLayout({
   selectedRepo,
   graphData,
   filterOptions,
+  isLoading,
   isLoadingReadmes,
   error,
   showCreateModal,
+  showSearchModal,
+  onShowSearchModal,
   isEditingReadme,
   viewMode,
   openTabs,
@@ -55,6 +62,7 @@ function MainLayout({
   onSelectRepo,
   onCloseTab,
   onCategoryFilterChange,
+  onDismissError,
   onCreateRepo,
   onReadmeSaved,
   onUpdateTopics,
@@ -126,8 +134,13 @@ function MainLayout({
         onToggleExplorer={() => setShowExplorer((v) => !v)}
       />
 
-      {error && <div className="error-banner">{error}</div>}
-      {isLoadingReadmes && <div className="loading-readmes">⏳ Loading README files…</div>}
+      {error && (
+        <div className="error-banner">
+          <span>{error}</span>
+          <button className="error-dismiss" onClick={onDismissError} title="Dismiss">✕</button>
+        </div>
+      )}
+      {isLoadingReadmes && <div className="loading-readmes"><IconLoading style={{marginRight: '8px'}} /> Loading README files…</div>}
 
       <div className="main-content">
         {/* LEFT: File Explorer */}
@@ -154,8 +167,8 @@ function MainLayout({
             onMoveCategory={onMoveCategory}
             searchQuery={searchQuery}
           />
-          <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)}>
-            + New Note
+          <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)} style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}>
+            <IconPlus /> New Note
           </button>
         </aside>
 
@@ -211,8 +224,8 @@ function MainLayout({
                     >
                       View on GitHub
                     </a>
-                    <button onClick={() => onEditReadme(true)} className="edit-readme-btn">
-                      ✎ Edit
+                    <button onClick={() => onEditReadme(true)} className="edit-readme-btn" style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+                      <IconEdit /> Edit
                     </button>
                   </div>
                 </div>
@@ -311,7 +324,19 @@ function MainLayout({
         <CreateRepoModal
           onSubmit={onCreateRepo}
           onClose={() => onShowCreateModal(false)}
-          isLoading={false}
+          isLoading={isLoading}
+        />
+      )}
+
+      {showSearchModal && (
+        <SearchModal
+          repos={repos}
+          readmeContents={readmeContents}
+          onSelectRepo={(repoName) => {
+            onSelectRepo(repoName);
+            onShowSearchModal(false);
+          }}
+          onClose={() => onShowSearchModal(false)}
         />
       )}
     </div>

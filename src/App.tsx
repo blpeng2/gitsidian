@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer } from 'react';
+import { useCallback, useEffect, useMemo, useReducer } from 'react';
 import { AppAction, AppState, FilterOptions, NoteCategory } from './types';
 import { githubService } from './services/github';
 import { storageService } from './services/storage';
@@ -22,6 +22,7 @@ const initialState: AppState = {
     topicFilter: null,
   },
   showCreateModal: false,
+  showSearchModal: false,
   isEditingReadme: false,
   isLoading: false,
   isLoadingReadmes: false,
@@ -117,6 +118,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         showCreateModal: action.payload,
       };
+    case 'SET_SHOW_SEARCH_MODAL':
+      return { ...state, showCreateModal: false, showSearchModal: action.payload };
     case 'SET_EDITING_README':
       return {
         ...state,
@@ -219,15 +222,35 @@ function App() {
 
     const savedToken = storageService.getAccessToken();
     const envToken = import.meta.env.VITE_GITHUB_TOKEN;
-    const tokenToUse = savedToken || (envToken && !savedToken ? envToken : null);
+    const tokenToUse = savedToken ?? envToken ?? null;
 
     if (tokenToUse) {
       githubService.setAccessToken(tokenToUse);
-      dispatch({
-        type: 'SET_AUTHENTICATED',
-        payload: { isAuthenticated: true, accessToken: tokenToUse },
+      githubService.validateToken().then((valid) => {
+        if (valid) {
+          dispatch({
+            type: 'SET_AUTHENTICATED',
+            payload: { isAuthenticated: true, accessToken: tokenToUse },
+          });
+        } else {
+          storageService.removeAccessToken();
+          dispatch({ type: 'SET_ERROR', payload: 'Saved token is expired or invalid. Please log in again.' });
+        }
+      }).catch(() => {
+        storageService.removeAccessToken();
       });
     }
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        dispatch({ type: 'SET_SHOW_SEARCH_MODAL', payload: true });
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   useEffect(() => {
@@ -252,6 +275,11 @@ function App() {
 
   const handleUpdateFilters = (options: Partial<FilterOptions>) => {
     dispatch({ type: 'SET_FILTER_OPTIONS', payload: options });
+  };
+  void handleUpdateFilters;
+
+  const handleDismissError = () => {
+    dispatch({ type: 'SET_ERROR', payload: null });
   };
 
   const handleCreateRepo = async (name: string, description: string, isPrivate: boolean) => {
@@ -319,31 +347,42 @@ function App() {
     }
   };
 
-  const graphData = generateGraphData(state.repos, state.readmeContents);
-  const selectedRepoData = state.repos.find((repo) => repo.name === state.selectedRepo) || null;
+  const graphData = useMemo(
+    () => generateGraphData(state.repos, state.readmeContents),
+    [state.repos, state.readmeContents]
+  );
 
-  const backlinkCounts: Record<string, number> = {};
-  state.repos.forEach((repo) => {
-    const backlinks = getBacklinks(repo.name, state.readmeContents);
-    backlinkCounts[repo.name] = backlinks.length;
-  });
+  const selectedRepoData = useMemo(
+    () => state.repos.find((repo) => repo.name === state.selectedRepo) ?? null,
+    [state.repos, state.selectedRepo]
+  );
 
-  const recommendations = getRecommendations(state.repos, state.readmeContents, backlinkCounts);
-  const recommendationMap: Record<string, string> = {};
-  recommendations.forEach((recommendation) => {
-    recommendationMap[recommendation.repoName] = `${getCategoryIcon(recommendation.suggestedCategory)} → ${getCategoryLabel(recommendation.suggestedCategory)}: ${recommendation.reason}`;
-  });
+  const backlinkCounts = useMemo<Record<string, number>>(() => {
+    const counts: Record<string, number> = {};
+    state.repos.forEach((repo) => {
+      counts[repo.name] = getBacklinks(repo.name, state.readmeContents).length;
+    });
+    return counts;
+  }, [state.repos, state.readmeContents]);
+
+  const recommendations = useMemo(
+    () => getRecommendations(state.repos, state.readmeContents, backlinkCounts),
+    [state.repos, state.readmeContents, backlinkCounts]
+  );
+
+  const recommendationMap = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    recommendations.forEach((rec) => {
+      map[rec.repoName] = `${getCategoryIcon(rec.suggestedCategory)} → ${getCategoryLabel(rec.suggestedCategory)}: ${rec.reason}`;
+    });
+    return map;
+  }, [recommendations]);
 
   if (!state.isAuthenticated) {
     return (
       <LoginScreen
         isLoading={state.isLoading}
         error={state.error}
-        onTokenLogin={(token: string) => {
-          storageService.setAccessToken(token);
-          githubService.setAccessToken(token);
-          dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
-        }}
       />
     );
   }
@@ -355,9 +394,12 @@ function App() {
       selectedRepo={selectedRepoData}
       graphData={graphData}
       filterOptions={state.filterOptions}
+      isLoading={state.isLoading}
       isLoadingReadmes={state.isLoadingReadmes}
       error={state.error}
       showCreateModal={state.showCreateModal}
+      showSearchModal={state.showSearchModal}
+      onShowSearchModal={(show: boolean) => dispatch({ type: 'SET_SHOW_SEARCH_MODAL', payload: show })}
       isEditingReadme={state.isEditingReadme}
       openTabs={state.openTabs}
       categoryFilter={state.categoryFilter}
@@ -365,7 +407,7 @@ function App() {
       onSelectRepo={handleSelectRepo}
       onCloseTab={(repoName: string) => dispatch({ type: 'CLOSE_TAB', payload: repoName })}
       onCategoryFilterChange={(category: NoteCategory | 'all') => dispatch({ type: 'SET_CATEGORY_FILTER', payload: category })}
-      onUpdateFilters={handleUpdateFilters}
+      onDismissError={handleDismissError}
       onLogout={handleLogout}
       onCreateRepo={handleCreateRepo}
       onReadmeSaved={handleReadmeSaved}

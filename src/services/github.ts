@@ -109,8 +109,10 @@ class GitHubService {
         repo,
       });
 
-      // Decode base64 content using browser API
-      const content = atob(data.content);
+      // Decode base64 content with proper UTF-8 support
+      const binary = atob(data.content.replace(/\n/g, ''));
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      const content = new TextDecoder('utf-8').decode(bytes);
       return content;
     } catch (error) {
       // README might not exist

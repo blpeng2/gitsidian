@@ -1,4 +1,5 @@
 import { type MouseEvent } from 'react';
+import { IconGraph, IconClose } from './Icons';
 
 interface TabBarProps {
   tabs: string[];
@@ -23,7 +24,8 @@ function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGr
         className={`tab-item tab-graph ${viewMode === 'graph' ? 'active' : ''}`}
         onClick={onSelectGraph}
       >
-        <span className="tab-name">📊 Graph</span>
+        <IconGraph className="tab-icon" style={{marginRight: '6px'}} />
+        <span className="tab-name">Graph</span>
       </div>
       {tabs.map((tab) => (
         <div
@@ -33,7 +35,7 @@ function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGr
         >
           <span className="tab-name">{stripPrefix(tab)}</span>
           <button className="tab-close" onClick={(event) => handleClose(event, tab)}>
-            ×
+            <IconClose />
           </button>
         </div>
       ))}

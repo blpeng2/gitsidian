@@ -1,87 +1,47 @@
 import { useState } from 'react';
 import { githubService } from '../services/github';
+import { IconGraph } from './Icons';
 
 interface LoginScreenProps {
   isLoading: boolean;
   error: string | null;
-  onTokenLogin: (token: string) => void;
 }
 
-function LoginScreen({ isLoading, error, onTokenLogin }: LoginScreenProps) {
-  const [pat, setPat] = useState('');
-  const [patError, setPatError] = useState('');
+function LoginScreen({ isLoading, error }: LoginScreenProps) {
+  const [oauthError, setOauthError] = useState('');
 
   const handleOAuthLogin = () => {
     try {
       window.location.href = githubService.getOAuthUrl();
     } catch (authError) {
-      console.error('OAuth error:', authError);
+      const message = authError instanceof Error ? authError.message : 'OAuth login failed.';
+      setOauthError(message);
     }
-  };
-
-  const handlePatLogin = () => {
-    const token = pat.trim();
-    if (!token) {
-      setPatError('토큰을 입력해주세요.');
-      return;
-    }
-    setPatError('');
-    onTokenLogin(token);
-  };
-
-  const handlePatKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handlePatLogin();
   };
 
   return (
     <div className="login-screen">
-      <div className="login-container">
-        <h1>🔗 Gitsidian</h1>
-        <p className="login-subtitle">GitHub repositories as connected notes</p>
-
-        {error && <div className="error-message">{error}</div>}
-
-        {githubService.hasOAuthClientId() && (
-          <button
-            type="button"
-            className="oauth-button"
-            onClick={handleOAuthLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? 'Connecting...' : 'Login with GitHub'}
-          </button>
-        )}
-
-        <div className="pat-section">
-          <p className="pat-label">GitHub Personal Access Token</p>
-          <input
-            type="password"
-            className="pat-input"
-            placeholder="ghp_xxxxxxxxxxxx"
-            value={pat}
-            onChange={e => setPat(e.target.value)}
-            onKeyDown={handlePatKeyDown}
-            disabled={isLoading}
-          />
-          {patError && <p className="pat-error">{patError}</p>}
-          <button
-            type="button"
-            className="pat-button"
-            onClick={handlePatLogin}
-            disabled={isLoading || !pat.trim()}
-          >
-            토큰으로 로그인
-          </button>
-          <p className="pat-help">
-            <a
-              href="https://github.com/settings/tokens/new?scopes=repo,read:user"
-              target="_blank"
-              rel="noreferrer"
-            >
-              토큰 발급하기 →
-            </a>
-          </p>
+      <div className="login-card">
+        <div className="login-logo">
+          <IconGraph width="32" height="32" />
         </div>
+        <h1 className="login-title">Gitsidian</h1>
+        <p className="login-subtitle">Your GitHub repos as a knowledge graph</p>
+        
+        {error && <div className="login-error">{error}</div>}
+        
+        <button 
+          className="login-github-btn" 
+          onClick={handleOAuthLogin} 
+          disabled={isLoading}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+          </svg>
+          {isLoading ? 'Connecting…' : 'Continue with GitHub'}
+        </button>
+        
+        {oauthError && <p className="login-oauth-error">{oauthError}</p>}
       </div>
     </div>
   );

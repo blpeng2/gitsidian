@@ -2,8 +2,78 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { renderMarkdown } from '../utils/markdown';
 import { githubService } from '../services/github';
 import { storageService } from '../services/storage';
+import { IconBold, IconItalic, IconStrikethrough, IconH1, IconH2, IconH3, IconBulletList, IconNumberedList, IconCheckbox, IconLink, IconWikiLink, IconCode, IconCodeBlock, IconImage, IconQuote, IconHRule, IconEdit, IconClose } from './Icons';
 
 type SaveStatus = 'saved' | 'modified' | 'saving' | 'error';
+
+interface SlashCommand {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  insert: string;
+  cursorOffset?: number;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { id: 'h1', label: 'Heading 1', icon: <IconH1 />, insert: '# ' },
+  { id: 'h2', label: 'Heading 2', icon: <IconH2 />, insert: '## ' },
+  { id: 'h3', label: 'Heading 3', icon: <IconH3 />, insert: '### ' },
+  { id: 'bullet', label: 'Bullet List', icon: <IconBulletList />, insert: '- ' },
+  { id: 'numbered', label: 'Numbered List', icon: <IconNumberedList />, insert: '1. ' },
+  { id: 'todo', label: 'To-do', icon: <IconCheckbox />, insert: '- [ ] ' },
+  { id: 'code', label: 'Code Block', icon: <IconCodeBlock />, insert: '```\n\n```', cursorOffset: 4 },
+  { id: 'quote', label: 'Quote', icon: <IconQuote />, insert: '> ' },
+  {
+    id: 'table',
+    label: 'Table',
+    icon: '⊞',
+    insert: '| Column 1 | Column 2 |\n|----------|----------|\n| Cell 1   | Cell 2   |\n',
+  },
+  { id: 'math', label: 'Math Block', icon: '∑', insert: '$$\n\n$$', cursorOffset: 3 },
+  { id: 'hr', label: 'Divider', icon: <IconHRule />, insert: '\n---\n' },
+];
+
+function getCaretPixelPos(textarea: HTMLTextAreaElement, caretPos: number): { top: number; left: number } {
+  const mirror = document.createElement('div');
+  const style = window.getComputedStyle(textarea);
+  const props = [
+    'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+    'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+    'fontSizeAdjust', 'lineHeight', 'fontFamily', 'textAlign', 'textTransform',
+    'textIndent', 'textDecoration', 'letterSpacing', 'wordSpacing', 'tabSize',
+    'whiteSpace', 'wordBreak', 'overflowWrap',
+  ] as const;
+  for (const prop of props) {
+    const cssProp = prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+    mirror.style.setProperty(cssProp, style.getPropertyValue(cssProp));
+  }
+  mirror.style.position = 'absolute';
+  mirror.style.top = '0';
+  mirror.style.left = '0';
+  mirror.style.visibility = 'hidden';
+  mirror.style.overflow = 'hidden';
+  mirror.style.whiteSpace = 'pre-wrap';
+  mirror.style.wordBreak = 'break-word';
+
+  const before = document.createTextNode(textarea.value.substring(0, caretPos));
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b';
+  mirror.appendChild(before);
+  mirror.appendChild(marker);
+
+  const container = textarea.parentElement ?? document.body;
+  container.appendChild(mirror);
+  const markerRect = marker.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+  container.removeChild(mirror);
+
+  return {
+    top: markerRect.top - containerRect.top + textarea.scrollTop + 20,
+    left: Math.min(markerRect.left - containerRect.left, containerRect.width - 220),
+  };
+}
 
 interface ReadmeEditorProps {
   repoName: string;
@@ -35,6 +105,14 @@ function ReadmeEditor({
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [topicInput, setTopicInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashSearch, setSlashSearch] = useState('');
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [showInlineWikiPicker, setShowInlineWikiPicker] = useState(false);
+  const [inlineWikiSearch, setInlineWikiSearch] = useState('');
+  const [inlineWikiSelectedIndex, setInlineWikiSelectedIndex] = useState(0);
+  const [overlayPos, setOverlayPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shaRef = useRef<string | null>(null);
   const contentRef = useRef(initialContent);
@@ -46,6 +124,9 @@ function ReadmeEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wikiPickerRef = useRef<HTMLDivElement>(null);
   const topicPickerRef = useRef<HTMLDivElement>(null);
+  const slashInsertPosRef = useRef(0);
+  const wikiInsertPosRef = useRef(0);
+  const editorBodyRef = useRef<HTMLDivElement>(null);
 
   const saveToGitHub = useCallback(async () => {
     const contentToSave = contentRef.current;
@@ -109,6 +190,7 @@ function ReadmeEditor({
     contentRef.current = newContent;
     setSaveStatus('modified');
     setErrorMsg(null);
+    setUploadError(null);
     storageService.setDraft(repoName, newContent);
     queueDebouncedSave();
   }, [repoName, queueDebouncedSave]);
@@ -193,13 +275,90 @@ function ReadmeEditor({
       const imageUrl = await githubService.uploadImage(repoOwner, repoName, filename, base64);
       insertMarkdown(`![${originalName}](${imageUrl})`);
     } catch (error) {
-      console.error('Image upload failed:', error);
+      const message = error instanceof Error ? error.message : 'Image upload failed';
+      setUploadError(message);
+      setTimeout(() => setUploadError(null), 5000);
     } finally {
       setIsUploading(false);
     }
   }, [repoOwner, repoName, insertMarkdown]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showInlineWikiPicker) {
+      const filtered = repoNames
+        .filter((name) => name !== repoName)
+        .filter((name) => stripPrefix(name).toLowerCase().includes(inlineWikiSearch.toLowerCase()));
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowInlineWikiPicker(false);
+        setInlineWikiSearch('');
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setInlineWikiSelectedIndex((index) => Math.min(index + 1, filtered.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setInlineWikiSelectedIndex((index) => Math.max(index - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filtered[inlineWikiSelectedIndex]) {
+          insertWikiLink(filtered[inlineWikiSelectedIndex]);
+        }
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (filtered[inlineWikiSelectedIndex]) {
+          insertWikiLink(filtered[inlineWikiSelectedIndex]);
+        }
+        return;
+      }
+    }
+
+    if (showSlashMenu) {
+      const filtered = SLASH_COMMANDS.filter((command) => (
+        command.id.startsWith(slashSearch)
+          || command.label.toLowerCase().startsWith(slashSearch)
+      ));
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowSlashMenu(false);
+        setSlashSearch('');
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashSelectedIndex((index) => Math.min(index + 1, filtered.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashSelectedIndex((index) => Math.max(index - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filtered[slashSelectedIndex]) {
+          handleSlashCommand(filtered[slashSelectedIndex]);
+        }
+        return;
+      }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (filtered[slashSelectedIndex]) {
+          handleSlashCommand(filtered[slashSelectedIndex]);
+        }
+        return;
+      }
+    }
+
     if (e.key === 'z' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
       e.preventDefault();
       undo();
@@ -227,10 +386,48 @@ function ReadmeEditor({
   const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
 
   const insertWikiLink = useCallback((targetRepo: string) => {
-    insertMarkdown(`[[${stripPrefix(targetRepo)}]]`);
+    const linkText = `[[${stripPrefix(targetRepo)}]]`;
+
+    if (showInlineWikiPicker) {
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const cursor = textarea.selectionStart;
+        const insertStart = wikiInsertPosRef.current;
+        const newContent = content.substring(0, insertStart) + linkText + content.substring(cursor);
+        updateContent(newContent);
+        setTimeout(() => {
+          textarea.focus();
+          const newCursor = insertStart + linkText.length;
+          textarea.setSelectionRange(newCursor, newCursor);
+        }, 0);
+      }
+      setShowInlineWikiPicker(false);
+      setInlineWikiSearch('');
+      setInlineWikiSelectedIndex(0);
+      return;
+    }
+
+    insertMarkdown(linkText);
     setShowWikiPicker(false);
     setWikiSearch('');
-  }, [insertMarkdown]);
+  }, [showInlineWikiPicker, content, insertMarkdown, updateContent]);
+
+  const handleSlashCommand = useCallback((cmd: SlashCommand) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    const cursor = textarea.selectionStart;
+    const insertStart = slashInsertPosRef.current;
+    const newContent = content.substring(0, insertStart) + cmd.insert + content.substring(cursor);
+    updateContent(newContent);
+    setTimeout(() => {
+      textarea.focus();
+      const newCursor = insertStart + (cmd.cursorOffset ?? cmd.insert.length);
+      textarea.setSelectionRange(newCursor, newCursor);
+    }, 0);
+    setShowSlashMenu(false);
+    setSlashSearch('');
+    setSlashSelectedIndex(0);
+  }, [content, updateContent]);
 
   useEffect(() => {
     githubService.getReadmeSha(repoOwner, repoName).then((sha) => {
@@ -300,7 +497,7 @@ function ReadmeEditor({
     <div className="editor-fullscreen">
       <div className="editor-header">
         <div className="editor-title">
-          <span className="editor-icon">📝</span>
+          <span className="editor-icon"><IconEdit /></span>
           <h2>{stripPrefix(repoName)}</h2>
         </div>
         <div className="editor-header-actions">
@@ -308,13 +505,13 @@ function ReadmeEditor({
             className={`editor-tab ${!showPreview ? 'active' : ''}`}
             onClick={() => setShowPreview(false)}
           >
-            ✏️ Edit
+            Edit
           </button>
           <button
             className={`editor-tab ${showPreview ? 'active' : ''}`}
             onClick={() => setShowPreview(true)}
           >
-            👁 Preview
+            Preview
           </button>
           <div className="editor-header-separator" />
           <span className={`save-status save-status-${saveStatus}`}>
@@ -336,27 +533,28 @@ function ReadmeEditor({
               onClose();
             }}
             className="editor-close-btn"
+            style={{display: 'flex', alignItems: 'center', gap: '4px'}}
           >
-            ✕ Close
+            <IconClose /> Close
           </button>
         </div>
       </div>
 
       {!showPreview && (
         <div className="editor-toolbar">
-          <button title="Bold (Ctrl+B)" onClick={() => insertMarkdown('**', '**')}>B</button>
-          <button title="Italic (Ctrl+I)" onClick={() => insertMarkdown('*', '*')}>I</button>
-          <button title="Strikethrough" onClick={() => insertMarkdown('~~', '~~')}>S̶</button>
+          <button title="Bold (Ctrl+B)" onClick={() => insertMarkdown('**', '**')}><IconBold /></button>
+          <button title="Italic (Ctrl+I)" onClick={() => insertMarkdown('*', '*')}><IconItalic /></button>
+          <button title="Strikethrough" onClick={() => insertMarkdown('~~', '~~')}><IconStrikethrough /></button>
           <div className="toolbar-separator" />
-          <button title="Heading 1" onClick={() => insertMarkdown('# ')}>H1</button>
-          <button title="Heading 2" onClick={() => insertMarkdown('## ')}>H2</button>
-          <button title="Heading 3" onClick={() => insertMarkdown('### ')}>H3</button>
+          <button title="Heading 1" onClick={() => insertMarkdown('# ')}><IconH1 /></button>
+          <button title="Heading 2" onClick={() => insertMarkdown('## ')}><IconH2 /></button>
+          <button title="Heading 3" onClick={() => insertMarkdown('### ')}><IconH3 /></button>
           <div className="toolbar-separator" />
-          <button title="Bullet List" onClick={() => insertMarkdown('- ')}>•</button>
-          <button title="Numbered List" onClick={() => insertMarkdown('1. ')}>1.</button>
-          <button title="Checkbox" onClick={() => insertMarkdown('- [ ] ')}>☐</button>
+          <button title="Bullet List" onClick={() => insertMarkdown('- ')}><IconBulletList /></button>
+          <button title="Numbered List" onClick={() => insertMarkdown('1. ')}><IconNumberedList /></button>
+          <button title="Checkbox" onClick={() => insertMarkdown('- [ ] ')}><IconCheckbox /></button>
           <div className="toolbar-separator" />
-          <button title="Link" onClick={() => insertMarkdown('[', '](url)')}>🔗</button>
+          <button title="Link" onClick={() => insertMarkdown('[', '](url)')}><IconLink /></button>
           <div className="toolbar-dropdown-container" ref={wikiPickerRef}>
             <button
               title="Wiki-link"
@@ -367,7 +565,7 @@ function ReadmeEditor({
                 setWikiSearch('');
               }}
             >
-              ⟦⟧
+              <IconWikiLink />
             </button>
             {showWikiPicker && (
               <div className="toolbar-dropdown">
@@ -440,11 +638,11 @@ function ReadmeEditor({
               </div>
             )}
           </div>
-          <button title="Code" onClick={() => insertMarkdown('`', '`')}>{'<>'}</button>
-          <button title="Code Block" onClick={() => insertMarkdown('```\n', '\n```')}>{'{ }'}</button>
+          <button title="Code" onClick={() => insertMarkdown('`', '`')}><IconCode /></button>
+          <button title="Code Block" onClick={() => insertMarkdown('```\n', '\n```')}><IconCodeBlock /></button>
           <div className="toolbar-separator" />
-          <label className="toolbar-upload-btn" title="Upload Image">
-            📎
+          <label className="toolbar-upload-btn" title="Upload Image" style={{display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: '0 8px', borderRadius: '4px'}}>
+            <IconImage />
             <input
               type="file"
               accept="image/*"
@@ -458,18 +656,77 @@ function ReadmeEditor({
               }}
             />
           </label>
+          {uploadError && (
+            <span className="upload-error" style={{ color: 'var(--accent-danger)', fontSize: '0.8rem', marginLeft: '0.5rem' }}>
+              ⚠ {uploadError}
+            </span>
+          )}
           <div className="toolbar-separator" />
-          <button title="Quote" onClick={() => insertMarkdown('> ')}>❝</button>
-          <button title="Horizontal Rule" onClick={() => insertMarkdown('\n---\n')}>—</button>
+          <button title="Quote" onClick={() => insertMarkdown('> ')}><IconQuote /></button>
+          <button title="Horizontal Rule" onClick={() => insertMarkdown('\n---\n')}><IconHRule /></button>
         </div>
       )}
 
-      <div className="editor-body">
+      <div className="editor-body" ref={editorBodyRef}>
         {isUploading && (
           <div className="upload-overlay">
             <span>📤 Uploading image...</span>
           </div>
         )}
+        {showInlineWikiPicker && !showPreview && (() => {
+          const filtered = repoNames
+            .filter((name) => name !== repoName)
+            .filter((name) => stripPrefix(name).toLowerCase().includes(inlineWikiSearch.toLowerCase()))
+            .slice(0, 8);
+          return filtered.length > 0 ? (
+            <div
+              className="inline-autocomplete-dropdown"
+              style={{ top: overlayPos.top, left: overlayPos.left }}
+            >
+              {filtered.map((name, index) => (
+                <button
+                  key={name}
+                  className={`inline-autocomplete-item ${index === inlineWikiSelectedIndex ? 'selected' : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertWikiLink(name);
+                  }}
+                  onMouseEnter={() => setInlineWikiSelectedIndex(index)}
+                >
+                  <span className="inline-autocomplete-icon"><IconWikiLink /></span>
+                  {stripPrefix(name)}
+                </button>
+              ))}
+            </div>
+          ) : null;
+        })()}
+        {showSlashMenu && !showPreview && (() => {
+          const filtered = SLASH_COMMANDS.filter((command) => (
+            command.id.startsWith(slashSearch)
+              || command.label.toLowerCase().startsWith(slashSearch)
+          ));
+          return filtered.length > 0 ? (
+            <div
+              className="inline-autocomplete-dropdown slash-command-dropdown"
+              style={{ top: overlayPos.top, left: overlayPos.left }}
+            >
+              {filtered.map((cmd, index) => (
+                <button
+                  key={cmd.id}
+                  className={`inline-autocomplete-item ${index === slashSelectedIndex ? 'selected' : ''}`}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSlashCommand(cmd);
+                  }}
+                  onMouseEnter={() => setSlashSelectedIndex(index)}
+                >
+                  <span className="inline-autocomplete-icon slash-icon">{cmd.icon}</span>
+                  {cmd.label}
+                </button>
+              ))}
+            </div>
+          ) : null;
+        })()}
         {showPreview ? (
           <div
             className="editor-preview"
@@ -480,7 +737,45 @@ function ReadmeEditor({
             ref={textareaRef}
             className="editor-textarea"
             value={content}
-            onChange={(e) => updateContent(e.target.value)}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              const cursor = e.target.selectionStart;
+              updateContent(newValue);
+
+              const textBefore = newValue.substring(0, cursor);
+
+              const wikiMatch = /\[\[([^\][\n]*)$/.exec(textBefore);
+              if (wikiMatch) {
+                const insertStart = cursor - wikiMatch[0].length;
+                wikiInsertPosRef.current = insertStart;
+                setInlineWikiSearch(wikiMatch[1]);
+                setInlineWikiSelectedIndex(0);
+                if (!showInlineWikiPicker) {
+                  setShowInlineWikiPicker(true);
+                  const pos = getCaretPixelPos(e.target, insertStart);
+                  setOverlayPos(pos);
+                }
+              } else if (showInlineWikiPicker) {
+                setShowInlineWikiPicker(false);
+                setInlineWikiSearch('');
+              }
+
+              const slashMatch = /(?:^|\n)(\/([a-z]*))$/.exec(textBefore);
+              if (slashMatch) {
+                const insertStart = cursor - slashMatch[1].length;
+                slashInsertPosRef.current = insertStart;
+                setSlashSearch(slashMatch[2]);
+                setSlashSelectedIndex(0);
+                if (!showSlashMenu) {
+                  setShowSlashMenu(true);
+                  const pos = getCaretPixelPos(e.target, insertStart);
+                  setOverlayPos(pos);
+                }
+              } else if (showSlashMenu) {
+                setShowSlashMenu(false);
+                setSlashSearch('');
+              }
+            }}
             onKeyDown={handleKeyDown}
             onDragOver={(e) => {
               e.preventDefault();

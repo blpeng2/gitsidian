@@ -84,6 +84,7 @@ export interface AppState {
   openTabs: string[];
   filterOptions: FilterOptions;
   showCreateModal: boolean;
+  showSearchModal: boolean;
   isEditingReadme: boolean;
   isLoading: boolean;
   isLoadingReadmes: boolean;
@@ -104,6 +105,7 @@ export type AppAction =
   | { type: 'CLOSE_TAB'; payload: string }
   | { type: 'SET_FILTER_OPTIONS'; payload: Partial<FilterOptions> }
   | { type: 'SET_SHOW_CREATE_MODAL'; payload: boolean }
+  | { type: 'SET_SHOW_SEARCH_MODAL'; payload: boolean }
   | { type: 'SET_EDITING_README'; payload: boolean }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_READMES'; payload: boolean }

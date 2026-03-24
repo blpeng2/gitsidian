@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { GitHubRepo, NoteCategory } from '../types';
-import { getCategoryIcon, getCategoryLabel, getRepoCategory } from '../utils/categoryRules';
+import { getCategoryLabel, getRepoCategory } from '../utils/categoryRules';
+import { IconLock, IconGlobe, IconNote, IconLightbulb, IconChevronRight, IconChevronDown, IconInbox, IconActive, IconReference, IconArchive } from './Icons';
 
 interface RepoListProps {
   repos: GitHubRepo[];
@@ -13,6 +14,17 @@ interface RepoListProps {
   onMoveCategory: (repoName: string, category: NoteCategory) => void;
   searchQuery: string;
 }
+
+const CategoryIcon = ({ category, className = '' }: { category: NoteCategory | 'all', className?: string }) => {
+  switch (category) {
+    case 'inbox': return <IconInbox className={className} />;
+    case 'active': return <IconActive className={className} />;
+    case 'reference': return <IconReference className={className} />;
+    case 'archive': return <IconArchive className={className} />;
+    case 'all': return <IconNote className={className} />;
+    default: return <IconNote className={className} />;
+  }
+};
 
 function RepoList({
   repos,
@@ -114,14 +126,14 @@ function RepoList({
       >
         <div className="repo-item-header">
           <span className={`repo-visibility ${repo.private ? 'private' : 'public'}`}>
-            {repo.private ? '🔒' : '🌐'}
+            {repo.private ? <IconLock /> : <IconGlobe />}
           </span>
-          <span className="repo-category-badge">{getCategoryIcon(getRepoCategory(repo))}</span>
+          <span className="repo-category-badge"><CategoryIcon category={getRepoCategory(repo)} /></span>
           <span className="repo-name">{repo.name}</span>
-          {hasReadme && <span className="has-readme" title="Has README loaded">📄</span>}
+          {hasReadme && <span className="has-readme" title="Has README loaded"><IconNote /></span>}
           {recommendations[repo.name] && (
             <div className="recommendation-badge" title={recommendations[repo.name]}>
-              💡
+              <IconLightbulb />
             </div>
           )}
           <div className="category-move-actions">
@@ -137,7 +149,7 @@ function RepoList({
                   }}
                   title={`Move to ${getCategoryLabel(category)}`}
                 >
-                  {getCategoryIcon(category)}
+                  <CategoryIcon category={category} />
                 </button>
               ))}
           </div>
@@ -188,7 +200,9 @@ function RepoList({
             className={`category-tab ${categoryFilter === category ? 'active' : ''}`}
             onClick={() => onCategoryFilterChange(category)}
           >
-            {category === 'all' ? '📋 All' : `${getCategoryIcon(category)} ${getCategoryLabel(category)}`}
+            <span style={{display: 'flex', alignItems: 'center', gap: '4px'}}>
+              <CategoryIcon category={category} /> {category === 'all' ? 'All' : getCategoryLabel(category)}
+            </span>
             <span className="category-count">
               {category === 'all'
                 ? repos.length
@@ -210,8 +224,8 @@ function RepoList({
                   className="repo-category-header"
                   onClick={() => handleToggleSection(category)}
                 >
-                  <span>{collapsedSections[category] ? '▸' : '▾'}</span>
-                  <span>{getCategoryIcon(category)}</span>
+                  <span style={{display: 'flex', alignItems: 'center'}}>{collapsedSections[category] ? <IconChevronRight /> : <IconChevronDown />}</span>
+                  <span style={{display: 'flex', alignItems: 'center'}}><CategoryIcon category={category} /></span>
                   <span>{getCategoryLabel(category)}</span>
                   <span className="repo-category-size">{reposByCategory[category].length}</span>
                 </button>

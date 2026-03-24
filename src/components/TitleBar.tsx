@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import SettingsModal from './SettingsModal';
+import { IconSidebarClose, IconSidebarOpen, IconSettings, IconAI } from './Icons';
 
 declare global {
   interface Window {
@@ -30,7 +31,7 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
           onClick={onToggleExplorer}
           title={showExplorer ? 'Hide sidebar' : 'Show sidebar'}
         >
-          {showExplorer ? '◀' : '▶'}
+          {showExplorer ? <IconSidebarClose /> : <IconSidebarOpen />}
         </button>
         <input
           className="title-bar-search"
@@ -44,14 +45,14 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
           onClick={() => setShowSettings(true)}
           title="Settings"
         >
-          ⚙️
+          <IconSettings />
         </button>
         <button
           className="title-bar-btn"
           onClick={() => window.webkit?.messageHandlers?.toggleAIPanel?.postMessage(null)}
           title="Toggle AI Panel (⌘\)"
         >
-          🤖
+          <IconAI />
         </button>
       </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}

@@ -72,13 +72,13 @@ export function getRecommendations(
 export function getCategoryIcon(category: NoteCategory): string {
   switch (category) {
     case 'inbox':
-      return '📥';
+      return 'inbox';
     case 'active':
-      return '📌';
+      return 'active';
     case 'reference':
-      return '📚';
+      return 'reference';
     case 'archive':
-      return '🗃️';
+      return 'archive';
   }
 }
 
