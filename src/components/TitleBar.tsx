@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { ghCliService } from '../services/ghCli';
 import SettingsModal from './SettingsModal';
 import { IconSidebarClose, IconSidebarOpen, IconSettings, IconAI } from './Icons';
 
@@ -21,6 +22,16 @@ interface TitleBarProps {
 
 function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer }: TitleBarProps) {
   const [showSettings, setShowSettings] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<{ version: string; downloadUrl: string; releaseUrl: string } | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { version, downloadUrl, releaseUrl } = (e as CustomEvent).detail;
+      setUpdateInfo({ version, downloadUrl, releaseUrl });
+    };
+    window.addEventListener('updateAvailable', handler);
+    return () => window.removeEventListener('updateAvailable', handler);
+  }, []);
 
   return (
     <>
@@ -54,6 +65,15 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
         >
           <IconAI />
         </button>
+        {updateInfo && (
+          <button
+            className="title-bar-update-badge"
+            onClick={() => void ghCliService.openExternal(updateInfo.downloadUrl)}
+            title={`v${updateInfo.version} available — click to download`}
+          >
+            ↑ {updateInfo.version}
+          </button>
+        )}
       </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>

@@ -22,7 +22,7 @@ class GhCliService {
     };
   }
 
-  private send(action: string): Promise<unknown> {
+  private send(action: string, args?: string[]): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = Math.random().toString(36).slice(2, 10);
       const timer = setTimeout(() => {
@@ -36,7 +36,7 @@ class GhCliService {
         else reject(new Error(typeof data === 'string' ? data : 'gh error'));
       });
       const ghCliHandler = (window.webkit?.messageHandlers as { ghCli?: GhCliHandler } | undefined)?.ghCli;
-      ghCliHandler?.postMessage({ id, action });
+      ghCliHandler?.postMessage({ id, action, ...(args ? { args } : {}) });
     });
   }
 
@@ -71,6 +71,14 @@ class GhCliService {
     const token = await this.send('getToken');
     if (typeof token !== 'string' || !token) throw new Error('토큰을 가져올 수 없습니다');
     return token;
+  }
+
+  async openExternal(url: string): Promise<void> {
+    if (!this.isDesktop()) {
+        window.open(url, '_blank', 'noopener');
+        return;
+    }
+    await this.send('openExternal', [url]);
   }
 }
 

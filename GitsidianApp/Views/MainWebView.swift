@@ -36,6 +36,18 @@ struct MainWebView: NSViewRepresentable {
             }
         }
 
+        Task { [weak webViewRef = webView] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard let info = await UpdateChecker.shared.check() else { return }
+            let version = info.version
+            let dlUrl   = info.downloadUrl.replacingOccurrences(of: "'", with: "\\'")
+            let relUrl  = info.releaseUrl.replacingOccurrences(of: "'", with: "\\'")
+            let js = "window.dispatchEvent(new CustomEvent('updateAvailable',{detail:{version:'\(version)',downloadUrl:'\(dlUrl)',releaseUrl:'\(relUrl)'}}))"
+            DispatchQueue.main.async {
+                webViewRef?.evaluateJavaScript(js) { _, _ in }
+            }
+        }
+
         return webView
     }
 
@@ -238,6 +250,15 @@ struct MainWebView: NSViewRepresentable {
                             let token = try await GhService.shared.getToken()
                             let escaped = token.replacingOccurrences(of: "\"", with: "\\\"")
                             sendResult(callId, true, "\"\(escaped)\"")
+
+                        case "openExternal":
+                            let args = body["args"] as? [String] ?? []
+                            if let urlString = args.first, let url = URL(string: urlString) {
+                                DispatchQueue.main.async {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                            sendResult(callId, true, "true")
 
                         case "isAvailable":
                             let available = await GhService.shared.isAvailable
