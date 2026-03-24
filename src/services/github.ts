@@ -1,7 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { GitHubRepo } from '../types';
 
-const OAUTH_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || '';
+const OAUTH_CLIENT_ID = import.meta.env.VITE_OAUTH_CLIENT_ID || 'Ov23lifY5yEny3ChA0pm';
 const REPO_PREFIX = 'gitsidian-';
 
 class GitHubService {
