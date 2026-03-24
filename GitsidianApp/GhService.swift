@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 enum GhError: Error {
@@ -142,8 +143,7 @@ actor GhService {
 
                     var env = ProcessInfo.processInfo.environment
                     env["HOME"] = NSHomeDirectory()
-                    // macOS의 open 명령으로 브라우저 열기
-                    env["BROWSER"] = "open"
+                    env["BROWSER"] = "/bin/echo"
                     process.environment = env
 
                     let stdoutPipe = Pipe()
@@ -155,19 +155,54 @@ actor GhService {
 
                     try process.run()
 
-                    // gh가 "Press Enter to open..." 출력 후 stdin 대기 → 1초 후 Enter 전송
-                    Thread.sleep(forTimeInterval: 1.0)
-                    stdinPipe.fileHandleForWriting.write(Data("\n".utf8))
-                    stdinPipe.fileHandleForWriting.closeFile()
+                    var allOutput = ""
+                    var actionTaken = false
+                    let lock = NSLock()
+
+                    func handleOutput(_ text: String) {
+                        lock.lock()
+                        allOutput += text
+                        let shouldAct = !actionTaken && (
+                            allOutput.contains("Press Enter") ||
+                            allOutput.contains("press enter") ||
+                            allOutput.contains("open github.com")
+                        )
+                        if shouldAct { actionTaken = true }
+                        lock.unlock()
+
+                        guard shouldAct else { return }
+
+                        if let url = URL(string: "https://github.com/login/device") {
+                            DispatchQueue.main.async {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        stdinPipe.fileHandleForWriting.write(Data("\n".utf8))
+                    }
+
+                    stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
+                        let data = handle.availableData
+                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                        handleOutput(text)
+                    }
+                    stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+                        let data = handle.availableData
+                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+                        handleOutput(text)
+                    }
 
                     process.waitUntilExit()
+
+                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
+                    stderrPipe.fileHandleForReading.readabilityHandler = nil
+                    stdinPipe.fileHandleForWriting.closeFile()
 
                     if process.terminationStatus == 0 {
                         continuation.resume()
                     } else {
-                        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-                        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-                        continuation.resume(throwing: GhError.commandFailed(process.terminationStatus, stdout + stderr))
+                        continuation.resume(throwing: GhError.commandFailed(
+                            process.terminationStatus, allOutput
+                        ))
                     }
                 } catch {
                     continuation.resume(throwing: error)
