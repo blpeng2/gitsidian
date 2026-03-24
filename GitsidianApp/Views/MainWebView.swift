@@ -205,9 +205,9 @@ struct MainWebView: NSViewRepresentable {
 
                 Task {
                     func sendResult(_ id: String, _ success: Bool, _ data: String) {
-                        let js = "window.__ghCallback('\(id)', \(success), \(data))"
-                        Task { @MainActor in
-                            _ = try? await weakWebView?.evaluateJavaScript(js)
+                let js = "window.__ghCallback('\(id)', \(success), \(data))"
+                        DispatchQueue.main.async {
+                            weakWebView?.evaluateJavaScript(js) { _, _ in }
                         }
                     }
 
@@ -223,8 +223,8 @@ struct MainWebView: NSViewRepresentable {
                                 let escaped = userCode.replacingOccurrences(of: "'", with: "\\'")
                                 let uriEscaped = verificationUri.replacingOccurrences(of: "'", with: "\\'")
                                 let codeJs = "window.dispatchEvent(new CustomEvent('ghDeviceCode',{detail:{code:'\(escaped)',url:'\(uriEscaped)'}}))"
-                                Task { @MainActor in
-                                    _ = try? await weakWebView2?.evaluateJavaScript(codeJs)
+                                DispatchQueue.main.async {
+                                    weakWebView2?.evaluateJavaScript(codeJs) { _, _ in }
                                 }
                                 if let url = URL(string: verificationUri) {
                                     DispatchQueue.main.async {
