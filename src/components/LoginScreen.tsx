@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { githubService } from '../services/github';
 import { ghCliService } from '../services/ghCli';
 import { IconGraph } from './Icons';
@@ -12,7 +12,17 @@ interface LoginScreenProps {
 function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
   const [oauthError, setOauthError] = useState('');
   const [ghLoading, setGhLoading] = useState(false);
+  const [deviceCode, setDeviceCode] = useState('');
   const isDesktop = ghCliService.isDesktop();
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { code } = (e as CustomEvent<{ code: string; url: string }>).detail;
+      setDeviceCode(code);
+    };
+    window.addEventListener('ghDeviceCode', handler);
+    return () => window.removeEventListener('ghDeviceCode', handler);
+  }, []);
 
   const handleOAuthLogin = () => {
     try {
@@ -26,6 +36,7 @@ function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
   const handleGhLogin = async () => {
     if (!onGhLogin) return;
     setGhLoading(true);
+    setDeviceCode('');
     setOauthError('');
     try {
       await onGhLogin();
@@ -76,9 +87,19 @@ function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
         {oauthError && <p className="login-oauth-error">{oauthError}</p>}
 
         {ghLoading && (
-          <p className="login-gh-hint">
-            브라우저에서 GitHub 인증을 완료한 후 돌아오세요.
-          </p>
+          <div className="login-device-flow">
+            {deviceCode ? (
+              <>
+                <p className="login-gh-hint">브라우저에서 이 코드를 입력하세요:</p>
+                <div className="login-device-code">{deviceCode}</div>
+                <p className="login-gh-hint" style={{ fontSize: '0.75rem' }}>
+                  github.com/login/device
+                </p>
+              </>
+            ) : (
+              <p className="login-gh-hint">GitHub 연결 중…</p>
+            )}
+          </div>
         )}
       </div>
     </div>

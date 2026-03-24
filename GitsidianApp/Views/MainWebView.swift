@@ -218,7 +218,20 @@ struct MainWebView: NSViewRepresentable {
                             sendResult(callId, ok, ok ? "true" : "null")
 
                         case "login":
-                            try await GhService.shared.login()
+                            let weakWebView2 = self.webView
+                            try await GhService.shared.login { userCode, verificationUri in
+                                let escaped = userCode.replacingOccurrences(of: "'", with: "\\'")
+                                let uriEscaped = verificationUri.replacingOccurrences(of: "'", with: "\\'")
+                                let codeJs = "window.dispatchEvent(new CustomEvent('ghDeviceCode',{detail:{code:'\(escaped)',url:'\(uriEscaped)'}}))"
+                                Task { @MainActor in
+                                    _ = try? await weakWebView2?.evaluateJavaScript(codeJs)
+                                }
+                                if let url = URL(string: verificationUri) {
+                                    DispatchQueue.main.async {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                }
+                            }
                             sendResult(callId, true, "true")
 
                         case "getToken":

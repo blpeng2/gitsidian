@@ -1,6 +1,8 @@
 import AppKit
 import Foundation
 
+private let GH_CLIENT_ID = "Ov23lifY5yEny3ChA0pm"
+
 enum GhError: Error {
     case notFound
     case installFailed(String)
@@ -10,6 +12,7 @@ enum GhError: Error {
 actor GhService {
     static let shared = GhService()
     private(set) var ghPath: String?
+    private(set) var lastToken: String?
 
     func setup() async {
         if let path = findGhBinary() {
@@ -126,89 +129,102 @@ actor GhService {
     }
 
     func getToken() async throws -> String {
+        if let token = lastToken {
+            return token
+        }
         let (code, stdout, stderr) = try await run(["auth", "token"])
         guard code == 0 else { throw GhError.commandFailed(code, stderr) }
         return stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    func login() async throws {
-        guard let path = ghPath else { throw GhError.notFound }
+    func login(onDeviceCode: @escaping (_ userCode: String, _ verificationUri: String) -> Void) async throws {
+        let info = try await requestDeviceCode()
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: path)
-                    process.arguments = ["auth", "login", "--web", "--hostname", "github.com"]
+        onDeviceCode(info.userCode, info.verificationUri)
 
-                    var env = ProcessInfo.processInfo.environment
-                    env["HOME"] = NSHomeDirectory()
-                    env["BROWSER"] = "/bin/echo"
-                    process.environment = env
+        let token = try await pollForToken(
+            deviceCode: info.deviceCode,
+            interval: TimeInterval(info.interval)
+        )
 
-                    let stdoutPipe = Pipe()
-                    let stderrPipe = Pipe()
-                    let stdinPipe = Pipe()
-                    process.standardOutput = stdoutPipe
-                    process.standardError = stderrPipe
-                    process.standardInput = stdinPipe
+        if ghPath != nil {
+            _ = try? await run(["auth", "login", "--with-token"],
+                               stdinData: "\(token)\n".data(using: .utf8))
+        }
 
-                    try process.run()
+        lastToken = token
+    }
 
-                    var allOutput = ""
-                    var actionTaken = false
-                    let lock = NSLock()
+    private func parseParam(_ body: String, _ key: String) -> String? {
+        if let comps = URLComponents(string: "?" + body),
+           let value = comps.queryItems?.first(where: { $0.name == key })?.value {
+            return value
+        }
+        if let data = body.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let value = json[key] as? String {
+            return value
+        }
+        return nil
+    }
 
-                    func handleOutput(_ text: String) {
-                        lock.lock()
-                        allOutput += text
-                        let shouldAct = !actionTaken && (
-                            allOutput.contains("Press Enter") ||
-                            allOutput.contains("press enter") ||
-                            allOutput.contains("open github.com")
-                        )
-                        if shouldAct { actionTaken = true }
-                        lock.unlock()
+    private func requestDeviceCode() async throws -> (deviceCode: String, userCode: String, verificationUri: String, interval: Int) {
+        var req = URLRequest(url: URL(string: "https://github.com/login/device/code")!)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        req.httpBody = "client_id=\(GH_CLIENT_ID)&scope=repo%20read:user".data(using: .utf8)
 
-                        guard shouldAct else { return }
+        let (data, _) = try await URLSession.shared.data(for: req)
+        guard let body = String(data: data, encoding: .utf8),
+              let deviceCode = parseParam(body, "device_code"),
+              let userCode = parseParam(body, "user_code"),
+              let verificationUri = parseParam(body, "verification_uri") else {
+            throw GhError.installFailed("Device code 요청 실패")
+        }
+        let interval = Int(parseParam(body, "interval") ?? "5") ?? 5
+        return (deviceCode, userCode, verificationUri, interval)
+    }
 
-                        if let url = URL(string: "https://github.com/login/device") {
-                            DispatchQueue.main.async {
-                                NSWorkspace.shared.open(url)
-                            }
-                        }
-                        stdinPipe.fileHandleForWriting.write(Data("\n".utf8))
-                    }
+    private func pollForToken(deviceCode: String, interval: TimeInterval) async throws -> String {
+        var pollInterval = interval
+        var attempts = 0
 
-                    stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-                        handleOutput(text)
-                    }
-                    stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                        let data = handle.availableData
-                        guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
-                        handleOutput(text)
-                    }
+        while attempts < 180 {
+            try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
 
-                    process.waitUntilExit()
+            var req = URLRequest(url: URL(string: "https://github.com/login/oauth/access_token")!)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            let grantType = "urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"
+            req.httpBody = "client_id=\(GH_CLIENT_ID)&device_code=\(deviceCode)&grant_type=\(grantType)".data(using: .utf8)
 
-                    stdoutPipe.fileHandleForReading.readabilityHandler = nil
-                    stderrPipe.fileHandleForReading.readabilityHandler = nil
-                    stdinPipe.fileHandleForWriting.closeFile()
+            let (data, _) = try await URLSession.shared.data(for: req)
+            guard let body = String(data: data, encoding: .utf8) else {
+                attempts += 1
+                continue
+            }
 
-                    if process.terminationStatus == 0 {
-                        continuation.resume()
-                    } else {
-                        continuation.resume(throwing: GhError.commandFailed(
-                            process.terminationStatus, allOutput
-                        ))
-                    }
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+            if let token = parseParam(body, "access_token"), !token.isEmpty {
+                return token
+            }
+
+            switch parseParam(body, "error") {
+            case "authorization_pending":
+                attempts += 1
+            case "slow_down":
+                pollInterval += 5
+                attempts += 1
+            case "expired_token":
+                throw GhError.commandFailed(-1, "인증 코드가 만료되었습니다.")
+            case "access_denied":
+                throw GhError.commandFailed(-1, "인증이 거부되었습니다.")
+            default:
+                attempts += 1
             }
         }
+        throw GhError.commandFailed(-1, "인증 시간이 초과되었습니다.")
     }
 
     var isAvailable: Bool { ghPath != nil }
