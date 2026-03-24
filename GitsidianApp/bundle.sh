@@ -41,15 +41,16 @@ with open('$BUNDLE_DIR/Contents/Info.plist', 'wb') as f:
 
 echo -n "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
 
-echo "Signing..."
-codesign --force --sign - --options runtime "$BUNDLE_DIR"
-
 if [ -n "$SPARKLE_FW" ]; then
+    echo "Embedding Sparkle framework..."
     mkdir -p "$BUNDLE_DIR/Contents/Frameworks"
     cp -R "$SPARKLE_FW" "$BUNDLE_DIR/Contents/Frameworks/"
     install_name_tool -add_rpath "@executable_path/../Frameworks" "$BUNDLE_DIR/Contents/MacOS/GitsidianApp" 2>/dev/null || true
     codesign --force --sign - "$BUNDLE_DIR/Contents/Frameworks/Sparkle.framework" 2>/dev/null || true
 fi
+
+echo "Signing..."
+codesign --force --sign - --options runtime "$BUNDLE_DIR"
 
 echo "=== ✅ Created $BUNDLE_DIR ==="
 echo "Run with: open GitsidianApp/$BUNDLE_DIR"
