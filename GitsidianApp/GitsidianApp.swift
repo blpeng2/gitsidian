@@ -30,7 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             userDriverDelegate: nil
         )
         showMainWindow()
-        setupMenuCommands()
+        // SwiftUI rebuilds the menu bar after applicationDidFinishLaunching.
+        // Defer menu setup to ensure our items aren't overwritten.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.setupMenuCommands()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
