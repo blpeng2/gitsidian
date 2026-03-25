@@ -23,7 +23,8 @@ let package = Package(
                 "GitsidianApp.entitlements",
                 "build.sh",
                 "bundle.sh",
-                ".build"
+                ".build",
+                "Gitsidian.app"
             ],
             resources: [
                 .copy("Resources")
