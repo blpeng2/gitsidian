@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "GitsidianApp",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -16,7 +17,14 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle")
             ],
             path: ".",
-            exclude: ["Package.swift", "Info.plist", "GitsidianApp.entitlements", "build.sh", "bundle.sh"],
+            exclude: [
+                "Package.swift",
+                "Info.plist",
+                "GitsidianApp.entitlements",
+                "build.sh",
+                "bundle.sh",
+                ".build"
+            ],
             resources: [
                 .copy("Resources")
             ]
