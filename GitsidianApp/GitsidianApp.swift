@@ -9,46 +9,29 @@ private final class DraggableHostingView: NSHostingView<ContentView> {
 @main
 struct GitsidianApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    private let updaterController: SPUStandardUpdaterController
-
-    init() {
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
-    }
 
     var body: some Scene {
-        // WindowGroup을 사용하면 macOS 26에서 SwiftUI BarAppearanceBridge 버그로
-        // EXC_BAD_ACCESS 크래시 발생. AppDelegate에서 직접 NSWindow를 생성해 우회.
         Settings {
             EmptyView()
-        }
-        .commands {
-            CommandGroup(after: .appInfo) {
-                Button("Check for Updates\u{2026}") {
-                    updaterController.checkForUpdates(nil)
-                }
-            }
         }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var mainWindow: NSWindow?
+    private let updaterController = SPUStandardUpdaterController(
+        startingUpdater: true,
+        updaterDelegate: nil,
+        userDriverDelegate: nil
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installMainMenu()
         showMainWindow()
-        setupMenuCommands()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            // weak var이므로 창이 닫히면 mainWindow는 자동으로 nil
-            // showMainWindow()가 nil 확인 후 새 창 생성
-            showMainWindow()
-        }
+        if !flag { showMainWindow() }
         return true
     }
 
@@ -56,42 +39,98 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    // MARK: - Window
+    // MARK: - Menu
 
-    private func showMainWindow() {
-        if let existing = mainWindow {
-            existing.makeKeyAndOrderFront(nil)
-            return
-        }
+    private func installMainMenu() {
+        let mainMenu = NSMenu()
 
-        // NSWindow(contentViewController:) 대신 명시적 rect로 생성.
-        // 해당 convenience init은 내부에서 layoutSubtreeIfNeeded를 동기 호출하여
-        // macOS 26의 BarAppearanceBridge SwiftUI 버그를 트리거함.
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.minSize = NSSize(width: 900, height: 600)
-        window.title = "Gitsidian"
-        window.center()
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.isMovableByWindowBackground = true
-        window.makeKeyAndOrderFront(nil)
-        mainWindow = window
+        // App menu
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu()
+        appMenu.addItem(NSMenuItem(title: "About Gitsidian", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        let updateItem = NSMenuItem(title: "Check for Updates\u{2026}", action: #selector(checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = self
+        appMenu.addItem(updateItem)
+        appMenu.addItem(.separator())
+        let servicesItem = NSMenuItem(title: "Services", action: nil, keyEquivalent: "")
+        let servicesMenu = NSMenu(title: "Services")
+        servicesItem.submenu = servicesMenu
+        NSApp.servicesMenu = servicesMenu
+        appMenu.addItem(servicesItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Hide Gitsidian", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"))
+        let hideOthers = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(hideOthers)
+        appMenu.addItem(NSMenuItem(title: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: ""))
+        appMenu.addItem(.separator())
+        appMenu.addItem(NSMenuItem(title: "Quit Gitsidian", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
 
-        // SwiftUI content를 다음 run loop으로 지연.
-        // applicationDidFinishLaunching 중 동기 SwiftUI 레이아웃이 일어나지 않도록 함.
-        DispatchQueue.main.async { [weak window] in
-            guard let window else { return }
-            let hostingView = DraggableHostingView(rootView: ContentView())
-            window.contentView = hostingView
-        }
+        // File menu
+        let fileMenuItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(makeItem("New Note", key: "n", mods: .command, action: #selector(handleCreateNewNote)))
+        fileMenuItem.submenu = fileMenu
+        mainMenu.addItem(fileMenuItem)
+
+        // Edit menu (standard)
+        let editMenuItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(NSMenuItem(title: "Undo", action: Selector(("undo:")), keyEquivalent: "z"))
+        editMenu.addItem(NSMenuItem(title: "Redo", action: Selector(("redo:")), keyEquivalent: "Z"))
+        editMenu.addItem(.separator())
+        editMenu.addItem(NSMenuItem(title: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x"))
+        editMenu.addItem(NSMenuItem(title: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c"))
+        editMenu.addItem(NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v"))
+        editMenu.addItem(NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a"))
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        // Panels menu
+        let panelsMenuItem = NSMenuItem(title: "Panels", action: nil, keyEquivalent: "")
+        let panelsMenu = NSMenu(title: "Panels")
+        panelsMenu.addItem(makeItem("Toggle AI Panel", key: "\\", mods: .command, action: #selector(handleToggleAIPanel)))
+        panelsMenu.addItem(.separator())
+        panelsMenu.addItem(makeItem("Notes View", key: "1", mods: .command, action: #selector(handleSwitchToNotes)))
+        panelsMenu.addItem(makeItem("Graph View", key: "2", mods: .command, action: #selector(handleSwitchToGraph)))
+        panelsMenuItem.submenu = panelsMenu
+        mainMenu.addItem(panelsMenuItem)
+
+        // Debug menu
+        let debugMenuItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
+        let debugMenu = NSMenu(title: "Debug")
+        debugMenu.addItem(makeItem("Toggle Dev Mode", key: "", mods: [], action: #selector(handleToggleDevMode)))
+        debugMenu.addItem(makeItem("Reload Web App", key: "r", mods: [.command, .shift], action: #selector(handleReloadWebApp)))
+        debugMenuItem.submenu = debugMenu
+        mainMenu.addItem(debugMenuItem)
+
+        // Window menu
+        let windowMenuItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+        let windowMenu = NSMenu(title: "Window")
+        windowMenu.addItem(NSMenuItem(title: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m"))
+        windowMenu.addItem(NSMenuItem(title: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: ""))
+        windowMenuItem.submenu = windowMenu
+        NSApp.windowsMenu = windowMenu
+        mainMenu.addItem(windowMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
-    // MARK: - Menus
+    @objc private func checkForUpdates(_ sender: Any?) {
+        updaterController.checkForUpdates(sender)
+    }
+
+    private func makeItem(_ title: String, key: String, mods: NSEvent.ModifierFlags, action: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.keyEquivalentModifierMask = mods
+        item.target = self
+        return item
+    }
+
+    // MARK: - Window
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls {
@@ -110,43 +149,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setupMenuCommands() {
-        let mainMenu = NSApp.mainMenu
-        let menuDebugMessage = "[Menu Debug] items: \(mainMenu?.items.map { "\($0.title.isEmpty ? "(empty)" : $0.title) sub:\($0.submenu != nil)" } ?? [])"
-        print(menuDebugMessage)
-        NSLog("%@", menuDebugMessage)
-        guard let mainMenu else { return }
-
-        // File > New Note
-        if let fileMenu = mainMenu.item(withTitle: "File")?.submenu {
-            let item = makeItem("New Note", key: "n", mods: .command, action: #selector(handleCreateNewNote))
-            fileMenu.insertItem(item, at: 1)
+    private func showMainWindow() {
+        if let existing = mainWindow {
+            existing.makeKeyAndOrderFront(nil)
+            return
         }
 
-        // Panels menu
-        let panelsMenu = NSMenu(title: "Panels")
-        panelsMenu.addItem(makeItem("Toggle AI Panel", key: "\\", mods: .command, action: #selector(handleToggleAIPanel)))
-        panelsMenu.addItem(.separator())
-        panelsMenu.addItem(makeItem("Notes View", key: "1", mods: .command, action: #selector(handleSwitchToNotes)))
-        panelsMenu.addItem(makeItem("Graph View", key: "2", mods: .command, action: #selector(handleSwitchToGraph)))
-        let panelsItem = NSMenuItem(title: "Panels", action: nil, keyEquivalent: "")
-        panelsItem.submenu = panelsMenu
-        mainMenu.insertItem(panelsItem, at: mainMenu.numberOfItems - 1)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.minSize = NSSize(width: 900, height: 600)
+        window.title = "Gitsidian"
+        window.center()
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.makeKeyAndOrderFront(nil)
+        mainWindow = window
 
-        // Debug menu
-        let debugMenu = NSMenu(title: "Debug")
-        debugMenu.addItem(makeItem("Toggle Dev Mode", key: "", mods: [], action: #selector(handleToggleDevMode)))
-        debugMenu.addItem(makeItem("Reload Web App", key: "r", mods: [.command, .shift], action: #selector(handleReloadWebApp)))
-        let debugItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
-        debugItem.submenu = debugMenu
-        mainMenu.insertItem(debugItem, at: mainMenu.numberOfItems - 1)
-    }
-
-    private func makeItem(_ title: String, key: String, mods: NSEvent.ModifierFlags, action: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        item.keyEquivalentModifierMask = mods
-        item.target = self
-        return item
+        DispatchQueue.main.async { [weak window] in
+            guard let window else { return }
+            let hostingView = DraggableHostingView(rootView: ContentView())
+            window.contentView = hostingView
+        }
     }
 
     // MARK: - Actions
