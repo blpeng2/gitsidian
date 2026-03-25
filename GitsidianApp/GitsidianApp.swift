@@ -103,15 +103,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuCommands() {
         guard let mainMenu = NSApp.mainMenu else { return }
 
-        if let appMenu = mainMenu.items.first?.submenu {
-            let updateItem = NSMenuItem(
-                title: "Check for Updates\u{2026}",
-                action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-                keyEquivalent: ""
-            )
-            updateItem.target = updaterController
-            appMenu.insertItem(updateItem, at: 1)
-            appMenu.insertItem(.separator(), at: 2)
+        let appMenu: NSMenu
+        if let found = mainMenu.items.first(where: { $0.submenu != nil })?.submenu {
+            appMenu = found
+        } else {
+            let menuItem = NSMenuItem()
+            let menu = NSMenu(title: "")
+            menu.addItem(NSMenuItem(title: "About Gitsidian", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
+            menu.addItem(.separator())
+            menuItem.submenu = menu
+            mainMenu.insertItem(menuItem, at: 0)
+            appMenu = menu
+        }
+
+        let updateItem = NSMenuItem(
+            title: "Check for Updates\u{2026}",
+            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        updateItem.target = updaterController
+        let insertAt = min(1, appMenu.numberOfItems)
+        appMenu.insertItem(updateItem, at: insertAt)
+        if appMenu.numberOfItems > insertAt + 1 {
+            appMenu.insertItem(.separator(), at: insertAt + 1)
         }
 
         // File > New Note
