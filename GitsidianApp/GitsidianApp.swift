@@ -101,30 +101,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupMenuCommands() {
-        guard let mainMenu = NSApp.mainMenu else { return }
+        let mainMenu = NSApp.mainMenu
+        let menuDebugMessage = "[Menu Debug] items: \(mainMenu?.items.map { "\($0.title.isEmpty ? "(empty)" : $0.title) sub:\($0.submenu != nil)" } ?? [])"
+        print(menuDebugMessage)
+        NSLog("%@", menuDebugMessage)
+        guard let mainMenu else { return }
 
-        let appMenu: NSMenu
-        if let found = mainMenu.items.first(where: { $0.submenu != nil })?.submenu {
-            appMenu = found
-        } else {
-            let menuItem = NSMenuItem()
-            let menu = NSMenu(title: "")
-            menu.addItem(NSMenuItem(title: "About Gitsidian", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: ""))
-            menu.addItem(.separator())
-            menuItem.submenu = menu
-            mainMenu.insertItem(menuItem, at: 0)
-            appMenu = menu
+        var foundAppMenu: NSMenu?
+        for item in mainMenu.items {
+            if let sub = item.submenu {
+                if sub.items.contains(where: { $0.action == #selector(NSApplication.terminate(_:)) }) {
+                    foundAppMenu = sub
+                    break
+                }
+            }
+        }
+        if foundAppMenu == nil {
+            let appMenuItem = NSMenuItem()
+            let newMenu = NSMenu(title: "")
+            newMenu.addItem(NSMenuItem(title: "About Gitsidian",
+                                       action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+                                       keyEquivalent: ""))
+            newMenu.addItem(.separator())
+            newMenu.addItem(NSMenuItem(title: "Quit Gitsidian",
+                                       action: #selector(NSApplication.terminate(_:)),
+                                       keyEquivalent: "q"))
+            appMenuItem.submenu = newMenu
+            mainMenu.insertItem(appMenuItem, at: 0)
+            foundAppMenu = newMenu
         }
 
-        let updateItem = NSMenuItem(
-            title: "Check for Updates\u{2026}",
-            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: ""
-        )
-        updateItem.target = updaterController
-        let insertAt = min(1, appMenu.numberOfItems)
-        appMenu.insertItem(updateItem, at: insertAt)
-        if appMenu.numberOfItems > insertAt + 1 {
+        if let appMenu = foundAppMenu {
+            let updateItem = NSMenuItem(
+                title: "Check for Updates\u{2026}",
+                action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
+                keyEquivalent: ""
+            )
+            updateItem.target = updaterController
+            let insertAt = min(1, appMenu.numberOfItems)
+            appMenu.insertItem(updateItem, at: insertAt)
             appMenu.insertItem(.separator(), at: insertAt + 1)
         }
 
