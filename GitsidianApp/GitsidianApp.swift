@@ -9,6 +9,15 @@ private final class DraggableHostingView: NSHostingView<ContentView> {
 @main
 struct GitsidianApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    private let updaterController: SPUStandardUpdaterController
+
+    init() {
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }
 
     var body: some Scene {
         // WindowGroup을 사용하면 macOS 26에서 SwiftUI BarAppearanceBridge 버그로
@@ -16,25 +25,22 @@ struct GitsidianApp: App {
         Settings {
             EmptyView()
         }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates\u{2026}") {
+                    updaterController.checkForUpdates(nil)
+                }
+            }
+        }
     }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private weak var mainWindow: NSWindow?
-    private var updaterController: SPUStandardUpdaterController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
         showMainWindow()
-        // SwiftUI rebuilds the menu bar after applicationDidFinishLaunching.
-        // Defer menu setup to ensure our items aren't overwritten.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.setupMenuCommands()
-        }
+        setupMenuCommands()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -110,42 +116,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         print(menuDebugMessage)
         NSLog("%@", menuDebugMessage)
         guard let mainMenu else { return }
-
-        var foundAppMenu: NSMenu?
-        for item in mainMenu.items {
-            if let sub = item.submenu {
-                if sub.items.contains(where: { $0.action == #selector(NSApplication.terminate(_:)) }) {
-                    foundAppMenu = sub
-                    break
-                }
-            }
-        }
-        if foundAppMenu == nil {
-            let appMenuItem = NSMenuItem()
-            let newMenu = NSMenu(title: "")
-            newMenu.addItem(NSMenuItem(title: "About Gitsidian",
-                                       action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
-                                       keyEquivalent: ""))
-            newMenu.addItem(.separator())
-            newMenu.addItem(NSMenuItem(title: "Quit Gitsidian",
-                                       action: #selector(NSApplication.terminate(_:)),
-                                       keyEquivalent: "q"))
-            appMenuItem.submenu = newMenu
-            mainMenu.insertItem(appMenuItem, at: 0)
-            foundAppMenu = newMenu
-        }
-
-        if let appMenu = foundAppMenu {
-            let updateItem = NSMenuItem(
-                title: "Check for Updates\u{2026}",
-                action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-                keyEquivalent: ""
-            )
-            updateItem.target = updaterController
-            let insertAt = min(1, appMenu.numberOfItems)
-            appMenu.insertItem(updateItem, at: insertAt)
-            appMenu.insertItem(.separator(), at: insertAt + 1)
-        }
 
         // File > New Note
         if let fileMenu = mainMenu.item(withTitle: "File")?.submenu {
