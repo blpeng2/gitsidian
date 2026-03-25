@@ -13,6 +13,7 @@ VITE_BASE_PATH=./ npm run build -- --outDir GitsidianApp/Resources/web
 
 echo "Building Swift app (release)..."
 cd GitsidianApp
+rm -rf "$BUNDLE_DIR"
 swift build -c release
 
 echo "Locating Sparkle framework..."
