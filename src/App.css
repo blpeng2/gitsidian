@@ -2285,6 +2285,15 @@ textarea {
   cursor: default;
 }
 
+.title-bar-version {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.6;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  user-select: none;
+}
+
 /* ========================================
    Settings Modal
    ======================================== */

@@ -57,6 +57,14 @@ struct MainWebView: NSViewRepresentable {
         )
         config.userContentController.addUserScript(dragScript)
 
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        let versionScript = WKUserScript(
+            source: "window.__APP_VERSION__ = '\(version)';",
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(versionScript)
+
         // macOS 26에서 제거된 private WKPreferences KVC 키들을 대체:
         //   developerExtrasEnabled → webView.isInspectable = true
         //   allowFileAccessFromFileURLs / allowUniversalAccessFromFileURLs → gitsidian:// 커스텀 스킴 핸들러

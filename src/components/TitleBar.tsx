@@ -21,6 +21,9 @@ interface TitleBarProps {
 
 function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer }: TitleBarProps) {
   const [showSettings, setShowSettings] = useState(false);
+  const [appVersion] = useState<string>(() => {
+    return (window as unknown as { __APP_VERSION__?: string }).__APP_VERSION__ ?? '';
+  });
 
   return (
     <>
@@ -54,6 +57,9 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
         >
           <IconAI />
         </button>
+        {appVersion && (
+          <span className="title-bar-version">{appVersion}</span>
+        )}
       </div>
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </>
