@@ -49,18 +49,6 @@ jobs:
       
       - name: Build and bundle (arm64)
         run: |
-          # Download Sparkle.framework outside GitsidianApp/ to prevent SPM resource conflicts
-          if [ ! -d "SparkleFramework/Sparkle.framework" ]; then
-            mkdir -p SparkleFramework
-            VER=$(curl -s https://api.github.com/repos/sparkle-project/Sparkle/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
-            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/v${VER}/Sparkle-${VER}.tar.xz" -o /tmp/sparkle.tar.xz
-            mkdir -p /tmp/sparkle_extract
-            tar -xJf /tmp/sparkle.tar.xz -C /tmp/sparkle_extract
-            MACOS_FW=$(find /tmp/sparkle_extract -path "*/macos*/Sparkle.framework" | head -1)
-            [ -z "$MACOS_FW" ] && MACOS_FW=$(find /tmp/sparkle_extract -name "Sparkle.framework" | head -1)
-            cp -R "$MACOS_FW" SparkleFramework/
-            rm -rf /tmp/sparkle_extract /tmp/sparkle.tar.xz
-          fi
           cd GitsidianApp
           rm -rf Gitsidian.app
           swift build -c release --triple arm64-apple-macosx
@@ -85,9 +73,9 @@ jobs:
           with open('$BUNDLE_DIR/Contents/Info.plist', 'wb') as f:
               plistlib.dump(plist, f)
           "
-          
+
           echo -n "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
-          SPARKLE_FW="../SparkleFramework/Sparkle.framework"
+          SPARKLE_FW=$(find .build -name "Sparkle.framework" -path "*/macos*" 2>/dev/null | head -1)
           if [ -n "$SPARKLE_FW" ]; then
             mkdir -p "$BUNDLE_DIR/Contents/Frameworks"
             cp -R "$SPARKLE_FW" "$BUNDLE_DIR/Contents/Frameworks/"
@@ -101,18 +89,6 @@ jobs:
       
       - name: Build and bundle (x86_64)
         run: |
-          # Download Sparkle.framework outside GitsidianApp/ to prevent SPM resource conflicts
-          if [ ! -d "SparkleFramework/Sparkle.framework" ]; then
-            mkdir -p SparkleFramework
-            VER=$(curl -s https://api.github.com/repos/sparkle-project/Sparkle/releases/latest | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))")
-            curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/v${VER}/Sparkle-${VER}.tar.xz" -o /tmp/sparkle.tar.xz
-            mkdir -p /tmp/sparkle_extract
-            tar -xJf /tmp/sparkle.tar.xz -C /tmp/sparkle_extract
-            MACOS_FW=$(find /tmp/sparkle_extract -path "*/macos*/Sparkle.framework" | head -1)
-            [ -z "$MACOS_FW" ] && MACOS_FW=$(find /tmp/sparkle_extract -name "Sparkle.framework" | head -1)
-            cp -R "$MACOS_FW" SparkleFramework/
-            rm -rf /tmp/sparkle_extract /tmp/sparkle.tar.xz
-          fi
           cd GitsidianApp
           rm -rf Gitsidian.app
           swift build -c release --triple x86_64-apple-macosx
@@ -137,9 +113,9 @@ jobs:
           with open('$BUNDLE_DIR/Contents/Info.plist', 'wb') as f:
               plistlib.dump(plist, f)
           "
-          
+
           echo -n "APPL????" > "$BUNDLE_DIR/Contents/PkgInfo"
-          SPARKLE_FW="../SparkleFramework/Sparkle.framework"
+          SPARKLE_FW=$(find .build -name "Sparkle.framework" -path "*/macos*" 2>/dev/null | head -1)
           if [ -n "$SPARKLE_FW" ]; then
             mkdir -p "$BUNDLE_DIR/Contents/Frameworks"
             cp -R "$SPARKLE_FW" "$BUNDLE_DIR/Contents/Frameworks/"
