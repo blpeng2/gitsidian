@@ -33,7 +33,7 @@
         </dict>
     </array>
     <key>SUFeedURL</key>
-    <string>https://blpeng2.github.io/gitsidian/appcast.xml</string>
+    <string>https://raw.githubusercontent.com/blpeng2/gitsidian/main/public/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>T4kB39YpUWlJPEr/BRrLkXACicS5Yqp/cSmAvtH/lCA=</string>
     <key>SUEnableAutomaticChecks</key>

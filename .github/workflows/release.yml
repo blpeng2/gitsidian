@@ -161,7 +161,7 @@ jobs:
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
               <channel>
                   <title>Gitsidian</title>
-                  <link>https://blpeng2.github.io/gitsidian/appcast.xml</link>
+                  <link>https://raw.githubusercontent.com/blpeng2/gitsidian/main/public/appcast.xml</link>
                   <description>Gitsidian Updates</description>
                   <language>en</language>
                   <item>
