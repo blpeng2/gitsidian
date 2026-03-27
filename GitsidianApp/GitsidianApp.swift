@@ -28,6 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
         showMainWindow()
+        // Trigger update check shortly after launch
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            self?.updaterController.updater.checkForUpdatesInBackground()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
