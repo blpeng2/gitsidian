@@ -6,22 +6,22 @@
         <description>Gitsidian Updates</description>
         <language>en</language>
         <item>
-            <title>Gitsidian 1.6.0</title>
-            <pubDate>Thu, 26 Mar 2026 10:54:32 +0000</pubDate>
+            <title>Gitsidian 1.7.0</title>
+            <pubDate>Fri, 27 Mar 2026 15:00:00 +0000</pubDate>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://github.com/blpeng2/gitsidian/releases/download/v1.6.0/Gitsidian-macOS-arm64.zip"
-                sparkle:version="1.6.0"
-                sparkle:edSignature="iaxNjS7lX7v/y4/EhThZMP1M6J6LrLMa6ppts+HsWP46hTQOn/WmjMFUtreLDmmAJH529hOO8ErFVEjpTVWZCw=="
-                length="2375716"
+                url="https://github.com/blpeng2/gitsidian/releases/download/v1.7.0/Gitsidian-macOS-arm64.zip"
+                sparkle:version="1.7.0"
+                sparkle:edSignature="Tnalmpe1yMICP8xvohtMKqPBMaZ7Kk48hWBIEKgHW/hp9MdphC+2kuVQCbPE5Fyz5bdGzrHIiur5fHiQXzUiBg=="
+                length="2381410"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="arm64" />
             <enclosure
-                url="https://github.com/blpeng2/gitsidian/releases/download/v1.6.0/Gitsidian-macOS-x86_64.zip"
-                sparkle:version="1.6.0"
-                sparkle:edSignature="t55vD0RKLlL/Mm/LGTTsekOhDb1NHGAZsnCuIO4NS2RQlLOapy2ASE0cxl0amapBimVRg08+rrrInszNoC0BCg=="
-                length="2378598"
+                url="https://github.com/blpeng2/gitsidian/releases/download/v1.7.0/Gitsidian-macOS-x86_64.zip"
+                sparkle:version="1.7.0"
+                sparkle:edSignature="CtEYGAaZhBHQ4fAWfP7h5sBx6d0KTF9hmdKKbZa4F6IjzLIE5i88biVghTBvIo0Dt9bjuKP61IR7ODdhJOE+BQ=="
+                length="2384243"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="x86_64" />
