@@ -1,6 +1,5 @@
 import { useMemo, useCallback } from 'react';
 import { GitHubRepo, DiaryEntry } from '../types';
-import DiaryCalendar from './DiaryCalendar';
 import DiaryEditor from './DiaryEditor';
 import { IconLoading } from './Icons';
 
@@ -14,7 +13,6 @@ interface DiaryViewProps {
   isLoadingDiary: boolean;
   onEnsureDiaryRepo: () => Promise<void>;
   onSelectDate: (date: string) => void;
-  onLoadEntry: (date: string) => void;
   onSave: (date: string, content: string, newSha: string) => void;
 }
 
@@ -28,13 +26,8 @@ function DiaryView({
   isLoadingDiary,
   onEnsureDiaryRepo,
   onSelectDate,
-  onLoadEntry,
   onSave,
 }: DiaryViewProps) {
-  const markedDates = useMemo(
-    () => new Set(Object.keys(diaryEntries)),
-    [diaryEntries]
-  );
 
   const repoNames = useMemo(
     () => repos.map((r) => r.name),
@@ -46,10 +39,6 @@ function DiaryView({
     [diaryEntries]
   );
 
-  const handleSelectDate = useCallback((date: string) => {
-    onSelectDate(date);
-    onLoadEntry(date);
-  }, [onSelectDate, onLoadEntry]);
 
   const handleEditorClose = useCallback(() => {
     onSelectDate('');
@@ -88,16 +77,6 @@ function DiaryView({
 
   return (
     <div className="diary-view">
-      <div className="diary-sidebar">
-        <div className="diary-sidebar-header">
-          <h3>📔 Diary</h3>
-        </div>
-        <DiaryCalendar
-          selectedDate={selectedDate}
-          markedDates={markedDates}
-          onSelectDate={handleSelectDate}
-        />
-      </div>
       <div className="diary-content">
         {selectedDate ? (
           <DiaryEditor

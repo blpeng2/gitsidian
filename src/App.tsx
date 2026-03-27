@@ -509,7 +509,7 @@ function App() {
   }, []);
 
   const graphData = useMemo(
-    () => generateGraphData(state.repos, state.readmeContents),
+    () => generateGraphData(state.repos.filter((r) => r.name !== 'gitsidian-diary'), state.readmeContents),
     [state.repos, state.readmeContents]
   );
 

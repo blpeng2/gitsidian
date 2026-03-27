@@ -2,11 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        var theme = localStorage.getItem('gitsidian_theme');
+        if (theme && theme !== 'midnight') {
+          document.documentElement.setAttribute('data-theme', theme);
+        }
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gitsidian</title>
-    <script type="module" crossorigin src="./assets/index-BG445WSW.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CL_qdHbi.css">
+    <script type="module" crossorigin src="./assets/index-JAqbzoQ5.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DYc0070Y.css">
   </head>
   <body>
     <div id="root"></div>

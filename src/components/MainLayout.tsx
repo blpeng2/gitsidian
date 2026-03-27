@@ -10,6 +10,7 @@ import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
 import TabBar from './TabBar';
 import DiaryView from './DiaryView';
+import DiaryCalendar from './DiaryCalendar';
 import TitleBar from './TitleBar';
 import SearchModal from './SearchModal';
 import { IconLoading, IconPlus, IconEdit } from './Icons';
@@ -159,6 +160,16 @@ function MainLayout({
     [selectedReadme]
   );
 
+  const diaryMarkedDates = useMemo(
+    () => new Set(Object.keys(diaryEntries)),
+    [diaryEntries]
+  );
+
+  const handleDiarySelectDate = useCallback((date: string) => {
+    onSelectDiaryDate(date);
+    onLoadDiaryEntry(date);
+  }, [onSelectDiaryDate, onLoadDiaryEntry]);
+
   const handleReadmeClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (!target.classList.contains('wikilink')) return;
@@ -196,32 +207,47 @@ function MainLayout({
         <aside
           className="explorer-sidebar"
           style={{
-            width: showExplorer && viewMode !== 'diary' ? explorerWidth : 0,
-            minWidth: showExplorer && viewMode !== 'diary' ? explorerWidth : 0,
+            width: showExplorer ? explorerWidth : 0,
+            minWidth: showExplorer ? explorerWidth : 0,
             overflow: 'hidden',
           }}
         >
-          <div className="explorer-header">
-            <h3>Notes</h3>
-            <span className="explorer-count">{repos.length}</span>
-          </div>
-          <RepoList
-            repos={repos}
-            readmeContents={readmeContents}
-            selectedRepo={selectedRepo?.name || null}
-            onSelectRepo={onSelectRepo}
-            categoryFilter={categoryFilter}
-            onCategoryFilterChange={onCategoryFilterChange}
-            recommendations={recommendations}
-            onMoveCategory={onMoveCategory}
-            searchQuery={searchQuery}
-          />
-          <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)} style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}>
-            <IconPlus /> New Note
-          </button>
+          {viewMode === 'diary' ? (
+            <>
+              <div className="explorer-header">
+                <h3>📔 Diary</h3>
+              </div>
+              <DiaryCalendar
+                selectedDate={selectedDiaryDate}
+                markedDates={diaryMarkedDates}
+                onSelectDate={handleDiarySelectDate}
+              />
+            </>
+          ) : (
+            <>
+              <div className="explorer-header">
+                <h3>Notes</h3>
+                <span className="explorer-count">{repos.length}</span>
+              </div>
+              <RepoList
+                repos={repos}
+                readmeContents={readmeContents}
+                selectedRepo={selectedRepo?.name || null}
+                onSelectRepo={onSelectRepo}
+                categoryFilter={categoryFilter}
+                onCategoryFilterChange={onCategoryFilterChange}
+                recommendations={recommendations}
+                onMoveCategory={onMoveCategory}
+                searchQuery={searchQuery}
+              />
+              <button className="explorer-new-btn" onClick={() => onShowCreateModal(true)} style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'}}>
+                <IconPlus /> New Note
+              </button>
+            </>
+          )}
         </aside>
 
-        {showExplorer && viewMode !== 'diary' && (
+        {showExplorer && (
           <div
             className="explorer-resize-handle"
             onMouseDown={handleExplorerResizeStart}
@@ -251,7 +277,6 @@ function MainLayout({
               isLoadingDiary={isLoadingDiary}
               onEnsureDiaryRepo={onEnsureDiaryRepo}
               onSelectDate={onSelectDiaryDate}
-              onLoadEntry={onLoadDiaryEntry}
               onSave={onDiarySaved}
             />
           ) : viewMode === 'graph' ? (
