@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const THEMES = [
   { id: 'midnight', label: '🌙 Midnight' },
@@ -56,4 +56,4 @@ function SettingsModal({ onClose }: SettingsModalProps) {
   );
 }
 
-export default SettingsModal;
+export default React.memo(SettingsModal);

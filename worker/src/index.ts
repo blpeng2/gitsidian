@@ -1,3 +1,5 @@
+/// <reference lib="webworker" />
+
 /**
  * Cloudflare Worker for GitHub OAuth token exchange
  *
@@ -71,6 +73,7 @@ async function handleCallback(request: Request, env: Env): Promise<Response> {
         platform = "desktop";
       }
     } catch {
+      // ignore
     }
   }
 

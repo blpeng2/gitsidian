@@ -1,4 +1,5 @@
 import { GitHubRepo } from '../types';
+import { stripPrefix } from './strings';
 
 export type SearchMatchType = 'name' | 'description' | 'topic' | 'content';
 
@@ -9,10 +10,6 @@ export interface SearchResult {
   matchType: SearchMatchType;
   excerpt: string;          // context around the match
   score: number;
-}
-
-function stripPrefix(name: string): string {
-  return name.replace(/^gitsidian-/, '');
 }
 
 function getExcerpt(text: string, query: string): string {

@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { SaveStatus } from '../types';
 import { renderMarkdown } from '../utils/markdown';
+import { stripPrefix } from '../utils/strings';
 import { githubService } from '../services/github';
 import { storageService } from '../services/storage';
 import { IconBold, IconItalic, IconStrikethrough, IconH1, IconH2, IconH3, IconBulletList, IconNumberedList, IconCheckbox, IconLink, IconWikiLink, IconCode, IconCodeBlock, IconImage, IconQuote, IconHRule, IconEdit, IconClose } from './Icons';
-
-type SaveStatus = 'saved' | 'modified' | 'saving' | 'error';
 
 interface SlashCommand {
   id: string;
@@ -127,6 +127,10 @@ function ReadmeEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wikiPickerRef = useRef<HTMLDivElement>(null);
   const topicPickerRef = useRef<HTMLDivElement>(null);
+  const renderedPreview = useMemo(
+    () => content ? renderMarkdown(content) : '',
+    [content]
+  );
   const slashInsertPosRef = useRef(0);
   const wikiInsertPosRef = useRef(0);
   const editorBodyRef = useRef<HTMLDivElement>(null);
@@ -162,7 +166,7 @@ function ReadmeEditor({
           const freshSha = await githubService.getReadmeSha(repoOwner, repoName);
           shaRef.current = freshSha;
         } catch (shaError) {
-          console.error('Failed to refresh README SHA:', shaError);
+          console.warn('Failed to refresh SHA:', shaError instanceof Error ? shaError.message : shaError);
         }
       }
     } finally {
@@ -386,8 +390,6 @@ function ReadmeEditor({
     }
   };
 
-  const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
-
   const insertWikiLink = useCallback((targetRepo: string) => {
     const linkText = `[[${stripPrefix(targetRepo)}]]`;
 
@@ -447,6 +449,7 @@ function ReadmeEditor({
       historyRef.current = [draft];
       historyIndexRef.current = 0;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -733,7 +736,7 @@ function ReadmeEditor({
         {showPreview ? (
           <div
             className="editor-preview"
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+            dangerouslySetInnerHTML={{ __html: renderedPreview }}
           />
         ) : (
           <textarea

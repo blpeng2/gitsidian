@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { githubService } from '../services/github';
 import { ghCliService } from '../services/ghCli';
 import { IconGraph } from './Icons';
@@ -120,4 +120,4 @@ function LoginScreen({ isLoading, error, onGhLogin }: LoginScreenProps) {
   );
 }
 
-export default LoginScreen;
+export default React.memo(LoginScreen);

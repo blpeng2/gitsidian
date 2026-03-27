@@ -30,17 +30,20 @@ export const IconGraph = (props: IconProps) => (
   </BaseIcon>
 );
 
+export const IconDiary = (props: IconProps) => (
+  <BaseIcon {...props}>
+    <rect x="3" y="2" width="10" height="12" rx="1" />
+    <path d="M6 2v12" />
+    <path d="M8 5h3" />
+    <path d="M8 7.5h3" />
+    <path d="M8 10h2" />
+  </BaseIcon>
+);
+
 export const IconNote = (props: IconProps) => (
   <BaseIcon {...props}>
     <path d="M3 2v12h10V5.5L9.5 2H3z" />
     <path d="M9 2v4h4" />
-  </BaseIcon>
-);
-
-export const IconSearch = (props: IconProps) => (
-  <BaseIcon {...props}>
-    <circle cx="7" cy="7" r="4.5" />
-    <path d="M10.5 10.5L14 14" />
   </BaseIcon>
 );
 
@@ -276,12 +279,6 @@ export const IconLightbulb = (props: IconProps) => (
   <BaseIcon {...props}>
     <path d="M8 2a4 4 0 0 0-4 4c0 1.5.8 2.8 2 3.5v1.5a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-1.5c1.2-.7 2-2 2-3.5a4 4 0 0 0-4-4z" />
     <path d="M7 14h2" />
-  </BaseIcon>
-);
-
-export const IconStar = (props: IconProps) => (
-  <BaseIcon {...props}>
-    <path d="M8 2l1.8 4 4.2.4-3.2 2.9 1 4.2-3.8-2.2L4.2 13.5l1-4.2L2 6.4l4.2-.4L8 2z" />
   </BaseIcon>
 );
 

@@ -1,18 +1,18 @@
-import { type MouseEvent } from 'react';
-import { IconGraph, IconClose } from './Icons';
+import React, { type MouseEvent } from 'react';
+import { IconGraph, IconDiary, IconClose } from './Icons';
+import { stripPrefix } from '../utils/strings';
 
 interface TabBarProps {
   tabs: string[];
   activeTab: string | null;
-  viewMode: 'notes' | 'graph';
+  viewMode: 'notes' | 'graph' | 'diary';
   onSelectTab: (repoName: string) => void;
   onCloseTab: (repoName: string) => void;
   onSelectGraph: () => void;
+  onSelectDiary: () => void;
 }
 
-function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGraph }: TabBarProps) {
-  const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
-
+function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGraph, onSelectDiary }: TabBarProps) {
   const handleClose = (event: MouseEvent, repoName: string) => {
     event.stopPropagation();
     onCloseTab(repoName);
@@ -26,6 +26,13 @@ function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGr
       >
         <IconGraph className="tab-icon" style={{marginRight: '6px'}} />
         <span className="tab-name">Graph</span>
+      </div>
+      <div
+        className={`tab-item tab-diary ${viewMode === 'diary' ? 'active' : ''}`}
+        onClick={onSelectDiary}
+      >
+        <IconDiary className="tab-icon" style={{marginRight: '6px'}} />
+        <span className="tab-name">Diary</span>
       </div>
       {tabs.map((tab) => (
         <div
@@ -43,4 +50,4 @@ function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGr
   );
 }
 
-export default TabBar;
+export default React.memo(TabBar);

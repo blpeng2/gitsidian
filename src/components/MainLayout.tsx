@@ -1,12 +1,15 @@
 import { type MouseEvent, useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { FilterOptions, GitHubRepo, GraphData, NoteCategory } from '../types';
+import { FilterOptions, GitHubRepo, GitHubUser, GraphData, NoteCategory } from '../types';
+import { DiaryEntry } from '../types';
 import GraphView from './GraphView';
 import RepoList from './RepoList';
 import { getBacklinks, getOutlinks } from '../utils/wikiLinks';
 import { renderMarkdown } from '../utils/markdown';
+import { stripPrefix } from '../utils/strings';
 import ReadmeEditor from './ReadmeEditor';
 import CreateRepoModal from './CreateRepoModal';
 import TabBar from './TabBar';
+import DiaryView from './DiaryView';
 import TitleBar from './TitleBar';
 import SearchModal from './SearchModal';
 import { IconLoading, IconPlus, IconEdit } from './Icons';
@@ -23,7 +26,7 @@ interface MainLayoutProps {
   showSearchModal: boolean;
   onShowSearchModal: (show: boolean) => void;
   isEditingReadme: boolean;
-  viewMode: 'notes' | 'graph';
+  viewMode: 'notes' | 'graph' | 'diary';
   openTabs: string[];
   categoryFilter: NoteCategory | 'all';
   recommendations: Record<string, string>;
@@ -31,15 +34,25 @@ interface MainLayoutProps {
   onCloseTab: (repoName: string) => void;
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
   onDismissError: () => void;
-  onLogout: () => void;
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
   onReadmeSaved: (repoName: string, content: string) => void;
   onUpdateTopics: (repoName: string, topics: string[]) => Promise<void>;
   onShowCreateModal: (show: boolean) => void;
   onEditReadme: (editing: boolean) => void;
   onCloseEditor: () => void;
-  onSetViewMode: (mode: 'notes' | 'graph') => void;
+  onSetViewMode: (mode: 'notes' | 'graph' | 'diary') => void;
   onMoveCategory: (repoName: string, category: NoteCategory) => void;
+  currentUser: GitHubUser | null;
+  diaryRepo: GitHubRepo | null;
+  diaryEntries: Record<string, DiaryEntry>;
+  diaryContents: Record<string, string>;
+  selectedDiaryDate: string | null;
+  isLoadingDiary: boolean;
+  onOpenDiary: () => void;
+  onEnsureDiaryRepo: () => Promise<void>;
+  onSelectDiaryDate: (date: string) => void;
+  onLoadDiaryEntry: (date: string) => void;
+  onDiarySaved: (date: string, content: string, newSha: string) => void;
 }
 
 function MainLayout({
@@ -71,8 +84,18 @@ function MainLayout({
   onCloseEditor,
   onSetViewMode,
   onMoveCategory,
+  currentUser,
+  diaryRepo,
+  diaryEntries,
+  diaryContents,
+  selectedDiaryDate,
+  isLoadingDiary,
+  onOpenDiary,
+  onEnsureDiaryRepo,
+  onSelectDiaryDate,
+  onLoadDiaryEntry,
+  onDiarySaved,
 }: MainLayoutProps) {
-  const stripPrefix = (name: string) => name.replace(/^gitsidian-/, '');
 
   const [showExplorer, setShowExplorer] = useState(true);
   const [explorerWidth, setExplorerWidth] = useState(260);
@@ -121,13 +144,19 @@ function MainLayout({
   const selectedReadme = selectedRepo ? readmeContents[selectedRepo.name] || '' : '';
   const backlinks = useMemo(
     () => (selectedRepo ? getBacklinks(selectedRepo.name, readmeContents) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedRepo?.name, readmeContents]
   );
   const outlinks = useMemo(
     () => (selectedRepo
       ? getOutlinks(selectedRepo.name, readmeContents, new Set(repos.map((repo) => repo.name)))
       : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedRepo?.name, readmeContents, repos]
+  );
+  const renderedReadme = useMemo(
+    () => selectedReadme ? renderMarkdown(selectedReadme) : '',
+    [selectedReadme]
   );
 
   const handleReadmeClick = (event: MouseEvent<HTMLDivElement>) => {
@@ -167,8 +196,8 @@ function MainLayout({
         <aside
           className="explorer-sidebar"
           style={{
-            width: showExplorer ? explorerWidth : 0,
-            minWidth: showExplorer ? explorerWidth : 0,
+            width: showExplorer && viewMode !== 'diary' ? explorerWidth : 0,
+            minWidth: showExplorer && viewMode !== 'diary' ? explorerWidth : 0,
             overflow: 'hidden',
           }}
         >
@@ -192,7 +221,7 @@ function MainLayout({
           </button>
         </aside>
 
-        {showExplorer && (
+        {showExplorer && viewMode !== 'diary' && (
           <div
             className="explorer-resize-handle"
             onMouseDown={handleExplorerResizeStart}
@@ -208,9 +237,24 @@ function MainLayout({
             onSelectTab={(repoName) => onSelectRepo(repoName)}
             onCloseTab={onCloseTab}
             onSelectGraph={() => onSetViewMode('graph')}
+            onSelectDiary={onOpenDiary}
           />
 
-          {viewMode === 'graph' ? (
+          {viewMode === 'diary' ? (
+            <DiaryView
+              owner={currentUser?.login ?? ''}
+              repos={repos}
+              diaryRepo={diaryRepo}
+              diaryEntries={diaryEntries}
+              diaryContents={diaryContents}
+              selectedDate={selectedDiaryDate}
+              isLoadingDiary={isLoadingDiary}
+              onEnsureDiaryRepo={onEnsureDiaryRepo}
+              onSelectDate={onSelectDiaryDate}
+              onLoadEntry={onLoadDiaryEntry}
+              onSave={onDiarySaved}
+            />
+          ) : viewMode === 'graph' ? (
             <div className="graph-container">
               <GraphView
                 data={graphData}
@@ -272,7 +316,7 @@ function MainLayout({
                   <div
                     className="note-content"
                     onClick={handleReadmeClick}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(selectedReadme) }}
+                    dangerouslySetInnerHTML={{ __html: renderedReadme }}
                   />
                 ) : (
                   <div className="note-empty">

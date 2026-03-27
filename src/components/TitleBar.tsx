@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import SettingsModal from './SettingsModal';
 import { IconSidebarClose, IconSidebarOpen, IconSettings, IconAI } from './Icons';
 
@@ -66,4 +66,4 @@ function TitleBar({ searchQuery, onSearchChange, showExplorer, onToggleExplorer 
   );
 }
 
-export default TitleBar;
+export default React.memo(TitleBar);

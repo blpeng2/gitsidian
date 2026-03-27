@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import React, { useState, type FormEvent } from 'react';
 
 interface CreateRepoModalProps {
   onSubmit: (name: string, description: string, isPrivate: boolean) => Promise<void>;
@@ -73,4 +73,4 @@ function CreateRepoModal({ onSubmit, onClose, isLoading }: CreateRepoModalProps)
   );
 }
 
-export default CreateRepoModal;
+export default React.memo(CreateRepoModal);

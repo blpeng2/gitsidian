@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
-import { AppAction, AppState, FilterOptions, NoteCategory } from './types';
+import { AppAction, AppState, DiaryEntry, NoteCategory } from './types';
 import { githubService } from './services/github';
 import { ghCliService } from './services/ghCli';
 import { storageService } from './services/storage';
@@ -30,6 +30,12 @@ const initialState: AppState = {
   error: null,
   viewMode: 'graph' as const,
   categoryFilter: 'all' as NoteCategory | 'all',
+  currentUser: null,
+  diaryRepo: null,
+  diaryEntries: {},
+  diaryContents: {},
+  selectedDiaryDate: null,
+  isLoadingDiary: false,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -66,6 +72,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
           [action.payload.repoName]: action.payload.content,
         },
       };
+    case 'SET_ALL_README_CONTENTS':
+      return { ...state, readmeContents: action.payload };
     case 'UPDATE_REPO_TOPICS':
       return {
         ...state,
@@ -162,6 +170,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ),
       };
     }
+    case 'SET_CURRENT_USER':
+      return { ...state, currentUser: action.payload };
+    case 'SET_DIARY_REPO':
+      return { ...state, diaryRepo: action.payload };
+    case 'SET_DIARY_ENTRIES':
+      return { ...state, diaryEntries: action.payload };
+    case 'SET_DIARY_CONTENT':
+      return {
+        ...state,
+        diaryContents: { ...state.diaryContents, [action.payload.date]: action.payload.content },
+        diaryEntries: {
+          ...state.diaryEntries,
+          [action.payload.date]: { date: action.payload.date, sha: action.payload.sha },
+        },
+      };
+    case 'SET_SELECTED_DIARY_DATE':
+      return { ...state, selectedDiaryDate: action.payload };
+    case 'SET_LOADING_DIARY':
+      return { ...state, isLoadingDiary: action.payload };
     default:
       return state;
   }
@@ -182,12 +209,7 @@ function App() {
 
       dispatch({ type: 'SET_LOADING_READMES', payload: true });
       const readmeContents = await githubService.fetchAllReadmes(repos);
-      Object.entries(readmeContents).forEach(([repoName, content]) => {
-        dispatch({
-          type: 'SET_README_CONTENT',
-          payload: { repoName, content },
-        });
-      });
+      dispatch({ type: 'SET_ALL_README_CONTENTS', payload: readmeContents });
     } catch (error) {
       dispatch({
         type: 'SET_ERROR',
@@ -217,6 +239,11 @@ function App() {
         type: 'SET_AUTHENTICATED',
         payload: { isAuthenticated: true, accessToken },
       });
+      void githubService.getCurrentUser().then((user) => {
+        dispatch({ type: 'SET_CURRENT_USER', payload: user });
+      }).catch((e) => {
+        console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
+      });
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
@@ -230,6 +257,11 @@ function App() {
             githubService.validateToken().then((valid) => {
               if (valid) {
                 dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
+                void githubService.getCurrentUser().then((user) => {
+                  dispatch({ type: 'SET_CURRENT_USER', payload: user });
+                }).catch((e) => {
+                  console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
+                });
               } else {
                 dispatch({ type: 'SET_ERROR', payload: 'GitHub 인증이 만료되었습니다. 다시 로그인해주세요.' });
               }
@@ -243,7 +275,9 @@ function App() {
             });
           }
         }
-      }).catch(() => {});
+      }).catch((e) => {
+        console.warn('gh CLI auth check failed:', e instanceof Error ? e.message : e);
+      });
       return;
     }
 
@@ -258,6 +292,11 @@ function App() {
           dispatch({
             type: 'SET_AUTHENTICATED',
             payload: { isAuthenticated: true, accessToken: tokenToUse },
+          });
+          void githubService.getCurrentUser().then((user) => {
+            dispatch({ type: 'SET_CURRENT_USER', payload: user });
+          }).catch((e) => {
+            console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
           });
         } else {
           storageService.removeAccessToken();
@@ -286,24 +325,9 @@ function App() {
     }
   }, [state.isAuthenticated, state.repos.length, fetchRepos]);
 
-  const handleLogout = () => {
-    storageService.removeAccessToken();
-    dispatch({
-      type: 'SET_AUTHENTICATED',
-      payload: { isAuthenticated: false, accessToken: null },
-    });
-    dispatch({ type: 'SET_REPOS', payload: [] });
-    dispatch({ type: 'SET_SELECTED_REPO', payload: null });
-  };
-
   const handleSelectRepo = (repoName: string | null) => {
     dispatch({ type: 'SET_SELECTED_REPO', payload: repoName });
   };
-
-  const handleUpdateFilters = (options: Partial<FilterOptions>) => {
-    dispatch({ type: 'SET_FILTER_OPTIONS', payload: options });
-  };
-  void handleUpdateFilters;
 
   const handleDismissError = () => {
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -374,6 +398,95 @@ function App() {
     }
   }, [state.repos]);
 
+  const handleLoadDiaryEntries = useCallback(async (owner: string) => {
+    dispatch({ type: 'SET_LOADING_DIARY', payload: true });
+    try {
+      const entries = await githubService.listDiaryEntries(owner);
+      const entriesMap: Record<string, DiaryEntry> = {};
+      entries.forEach((e) => { entriesMap[e.date] = e; });
+      dispatch({ type: 'SET_DIARY_ENTRIES', payload: entriesMap });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to load diary' });
+    } finally {
+      dispatch({ type: 'SET_LOADING_DIARY', payload: false });
+    }
+  }, []);
+
+  const handleOpenDiary = useCallback(async () => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: 'diary' });
+    if (!state.currentUser) return;
+    if (state.diaryRepo) return;
+    const existing = state.repos.find((r) => r.name === 'gitsidian-diary');
+    if (existing) {
+      dispatch({ type: 'SET_DIARY_REPO', payload: existing });
+      await handleLoadDiaryEntries(existing.owner.login);
+    }
+  }, [state.repos, state.diaryRepo, state.currentUser, handleLoadDiaryEntries]);
+
+  const handleEnsureDiaryRepo = useCallback(async () => {
+    if (!state.currentUser) return;
+    dispatch({ type: 'SET_LOADING_DIARY', payload: true });
+    try {
+      const repo = await githubService.ensureDiaryRepo(state.currentUser.login);
+      dispatch({ type: 'SET_DIARY_REPO', payload: repo });
+      if (!state.repos.some((r) => r.name === repo.name)) {
+        dispatch({ type: 'ADD_REPO', payload: repo });
+      }
+      await handleLoadDiaryEntries(state.currentUser.login);
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to create diary' });
+    } finally {
+      dispatch({ type: 'SET_LOADING_DIARY', payload: false });
+    }
+  }, [state.currentUser, state.repos, handleLoadDiaryEntries]);
+
+  const handleSelectDiaryDate = useCallback((date: string) => {
+    dispatch({ type: 'SET_SELECTED_DIARY_DATE', payload: date });
+  }, []);
+
+  const handleLoadDiaryEntry = useCallback(async (date: string) => {
+    if (!state.currentUser || state.diaryContents[date] !== undefined) return;
+    const draft = storageService.getDiaryDraft(date);
+    if (draft !== null) {
+      dispatch({ type: 'SET_DIARY_CONTENT', payload: { date, content: draft, sha: state.diaryEntries[date]?.sha ?? null } });
+      return;
+    }
+    try {
+      const result = await githubService.getDiaryEntry(state.currentUser.login, date);
+      dispatch({ type: 'SET_DIARY_CONTENT', payload: { date, content: result?.content ?? '', sha: result?.sha ?? null } });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to load entry' });
+    }
+  }, [state.currentUser, state.diaryContents, state.diaryEntries]);
+
+  const handleDiarySaved = useCallback((date: string, content: string, newSha: string) => {
+    dispatch({ type: 'SET_DIARY_CONTENT', payload: { date, content, sha: newSha } });
+  }, []);
+
+  const handleShowSearchModal = useCallback((show: boolean) => {
+    dispatch({ type: 'SET_SHOW_SEARCH_MODAL', payload: show });
+  }, []);
+
+  const handleCloseTab = useCallback((repoName: string) => {
+    dispatch({ type: 'CLOSE_TAB', payload: repoName });
+  }, []);
+
+  const handleCategoryFilterChange = useCallback((category: NoteCategory | 'all') => {
+    dispatch({ type: 'SET_CATEGORY_FILTER', payload: category });
+  }, []);
+
+  const handleShowCreateModal = useCallback((show: boolean) => {
+    dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show });
+  }, []);
+
+  const handleEditReadme = useCallback((editing: boolean) => {
+    dispatch({ type: 'SET_EDITING_README', payload: editing });
+  }, []);
+
+  const handleSetViewMode = useCallback((mode: 'notes' | 'graph' | 'diary') => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: mode });
+  }, []);
+
   const graphData = useMemo(
     () => generateGraphData(state.repos, state.readmeContents),
     [state.repos, state.readmeContents]
@@ -439,25 +552,35 @@ function App() {
       error={state.error}
       showCreateModal={state.showCreateModal}
       showSearchModal={state.showSearchModal}
-      onShowSearchModal={(show: boolean) => dispatch({ type: 'SET_SHOW_SEARCH_MODAL', payload: show })}
+      onShowSearchModal={handleShowSearchModal}
       isEditingReadme={state.isEditingReadme}
       openTabs={state.openTabs}
       categoryFilter={state.categoryFilter}
       recommendations={recommendationMap}
       onSelectRepo={handleSelectRepo}
-      onCloseTab={(repoName: string) => dispatch({ type: 'CLOSE_TAB', payload: repoName })}
-      onCategoryFilterChange={(category: NoteCategory | 'all') => dispatch({ type: 'SET_CATEGORY_FILTER', payload: category })}
+      onCloseTab={handleCloseTab}
+      onCategoryFilterChange={handleCategoryFilterChange}
       onDismissError={handleDismissError}
-      onLogout={handleLogout}
       onCreateRepo={handleCreateRepo}
       onReadmeSaved={handleReadmeSaved}
       onUpdateTopics={handleUpdateTopics}
-      onShowCreateModal={(show: boolean) => dispatch({ type: 'SET_SHOW_CREATE_MODAL', payload: show })}
-      onEditReadme={(editing: boolean) => dispatch({ type: 'SET_EDITING_README', payload: editing })}
+      onShowCreateModal={handleShowCreateModal}
+      onEditReadme={handleEditReadme}
       onCloseEditor={handleCloseEditor}
       viewMode={state.viewMode}
-      onSetViewMode={(mode: 'notes' | 'graph') => dispatch({ type: 'SET_VIEW_MODE', payload: mode })}
+      onSetViewMode={handleSetViewMode}
       onMoveCategory={handleMoveCategory}
+      currentUser={state.currentUser}
+      diaryRepo={state.diaryRepo}
+      diaryEntries={state.diaryEntries}
+      diaryContents={state.diaryContents}
+      selectedDiaryDate={state.selectedDiaryDate}
+      isLoadingDiary={state.isLoadingDiary}
+      onOpenDiary={handleOpenDiary}
+      onEnsureDiaryRepo={handleEnsureDiaryRepo}
+      onSelectDiaryDate={handleSelectDiaryDate}
+      onLoadDiaryEntry={handleLoadDiaryEntry}
+      onDiarySaved={handleDiarySaved}
     />
   );
 }

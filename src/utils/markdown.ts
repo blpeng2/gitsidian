@@ -1,6 +1,7 @@
 import DOMPurify, { type Config as DOMPurifyConfig } from 'dompurify';
 import katex from 'katex';
 import { marked } from 'marked';
+import { WIKILINK_PATTERN } from './wikiLinks';
 
 marked.setOptions({
   gfm: true,
@@ -35,7 +36,9 @@ function escapeHtml(str: string): string {
 }
 
 function renderWikiLinksInHtml(html: string): string {
-  return html.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, repoName: string, alias?: string) => {
+  const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
+
+  return html.replace(regex, (_match, repoName: string, alias?: string) => {
     const displayText = alias?.trim() || repoName.trim();
     return `<span class="wikilink" data-repo="${escapeHtml(repoName.trim())}">${escapeHtml(displayText)}</span>`;
   });

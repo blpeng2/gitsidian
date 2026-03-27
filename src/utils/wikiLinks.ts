@@ -1,12 +1,12 @@
 import { WikiLink, GitHubRepo, GraphData, GraphNode, GraphEdge } from '../types';
 
 // Wiki-link pattern: [[repo-name]] or [[repo-name|display text]]
-const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+export const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 
 /**
  * Parse wiki-links from text
  */
-export function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
+function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
   const links: WikiLink[] = [];
   let match: RegExpExecArray | null;
   // Reset regex lastIndex
@@ -30,7 +30,7 @@ export function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
 /**
  * Extract wiki-links from README content
  */
-export function extractLinksFromReadme(readmeContent: string, sourceRepo: string): WikiLink[] {
+function extractLinksFromReadme(readmeContent: string, sourceRepo: string): WikiLink[] {
   return parseWikiLinks(readmeContent, sourceRepo);
 }
 
@@ -168,9 +168,9 @@ export function getBacklinks(
   Object.entries(readmeContents).forEach(([sourceRepo, content]) => {
     if (sourceRepo === repoName) return;
     const links = parseWikiLinks(content, sourceRepo);
-    const linkToRepo = links.find((l) => l.target.toLowerCase() === repoName.toLowerCase());
-    if (linkToRepo) {
-      backlinks.push({ source: sourceRepo, alias: linkToRepo.alias });
+    const matching = links.filter((l) => l.target.toLowerCase() === repoName.toLowerCase());
+    if (matching.length > 0) {
+      backlinks.push(...matching.map((link) => ({ source: sourceRepo, alias: link.alias })));
     }
   });
 
@@ -189,25 +189,9 @@ export function getOutlinks(
   if (!content) return [];
 
   const links = parseWikiLinks(content, repoName);
-  return links
-    .filter((l) => findRepoName(repoNames, l.target))
-    .map((l) => ({ target: findRepoName(repoNames, l.target)!, alias: l.alias }));
-}
-
-/**
- * Render wiki-links as HTML spans (for README display)
- */
-export function renderWikiLinks(text: string): string {
-  const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
-  return text.replace(regex, (_match, repoName, alias) => {
-    const displayText = alias?.trim() || repoName.trim();
-    return `<span class="wikilink" data-repo="${repoName.trim()}">${displayText}</span>`;
-  });
-}
-
-/**
- * Format repo name as wiki-link
- */
-export function formatAsWikiLink(repoName: string): string {
-  return `[[${repoName}]]`;
+  return links.reduce<{ target: string; alias?: string }[]>((acc, l) => {
+    const resolved = findRepoName(repoNames, l.target);
+    if (resolved) acc.push({ target: resolved, alias: l.alias });
+    return acc;
+  }, []);
 }
