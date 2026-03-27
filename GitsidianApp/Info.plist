@@ -36,5 +36,9 @@
     <string>https://blpeng2.github.io/gitsidian/appcast.xml</string>
     <key>SUPublicEDKey</key>
     <string>T4kB39YpUWlJPEr/BRrLkXACicS5Yqp/cSmAvtH/lCA=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <true/>
 </dict>
 </plist>
