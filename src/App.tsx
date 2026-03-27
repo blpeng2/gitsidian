@@ -26,6 +26,7 @@ const initialState: AppState = {
   showSearchModal: false,
   isEditingReadme: false,
   isLoading: false,
+  isAuthChecking: true,
   isLoadingReadmes: false,
   error: null,
   viewMode: 'graph' as const,
@@ -46,6 +47,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isAuthenticated: action.payload.isAuthenticated,
         accessToken: action.payload.accessToken,
       };
+    case 'SET_AUTH_CHECKING':
+      return { ...state, isAuthChecking: action.payload };
     case 'SET_REPOS': {
       const availableRepoNames = new Set(action.payload.map((repo) => repo.name));
       const openTabs = state.openTabs.filter((repoName) => availableRepoNames.has(repoName));
@@ -228,6 +231,7 @@ function App() {
 
     if (oauthError) {
       dispatch({ type: 'SET_ERROR', payload: `GitHub OAuth failed: ${oauthError}` });
+      dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
@@ -239,45 +243,54 @@ function App() {
         type: 'SET_AUTHENTICATED',
         payload: { isAuthenticated: true, accessToken },
       });
-      void githubService.getCurrentUser().then((user) => {
-        dispatch({ type: 'SET_CURRENT_USER', payload: user });
-      }).catch((e) => {
-        console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
-      });
+      void githubService.getCurrentUser()
+        .then((user) => {
+          dispatch({ type: 'SET_CURRENT_USER', payload: user });
+        })
+        .catch((e) => {
+          console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
+        })
+        .finally(() => {
+          dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
+        });
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
 
     if (ghCliService.isDesktop()) {
-      ghCliService.checkAuth().then(async (authenticated) => {
-        if (authenticated) {
+      ghCliService.checkAuth()
+        .then(async (authenticated) => {
           try {
-            const token = await ghCliService.getToken();
-            githubService.setAccessToken(token);
-            githubService.validateToken().then((valid) => {
+            if (authenticated) {
+              const token = await ghCliService.getToken();
+              githubService.setAccessToken(token);
+              const valid = await githubService.validateToken();
+
               if (valid) {
                 dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
-                void githubService.getCurrentUser().then((user) => {
+                try {
+                  const user = await githubService.getCurrentUser();
                   dispatch({ type: 'SET_CURRENT_USER', payload: user });
-                }).catch((e) => {
+                } catch (e) {
                   console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
-                });
+                }
               } else {
                 dispatch({ type: 'SET_ERROR', payload: 'GitHub 인증이 만료되었습니다. 다시 로그인해주세요.' });
               }
-            }).catch(() => {
-              dispatch({ type: 'SET_ERROR', payload: 'GitHub 토큰 검증에 실패했습니다. 다시 로그인해주세요.' });
-            });
+            }
           } catch (error) {
             dispatch({
               type: 'SET_ERROR',
               payload: error instanceof Error ? error.message : '토큰을 가져올 수 없습니다',
             });
+          } finally {
+            dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
           }
-        }
-      }).catch((e) => {
-        console.warn('gh CLI auth check failed:', e instanceof Error ? e.message : e);
-      });
+        })
+        .catch((e) => {
+          console.warn('gh CLI auth check failed:', e instanceof Error ? e.message : e);
+          dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
+        });
       return;
     }
 
@@ -287,24 +300,32 @@ function App() {
 
     if (tokenToUse) {
       githubService.setAccessToken(tokenToUse);
-      githubService.validateToken().then((valid) => {
-        if (valid) {
-          dispatch({
-            type: 'SET_AUTHENTICATED',
-            payload: { isAuthenticated: true, accessToken: tokenToUse },
-          });
-          void githubService.getCurrentUser().then((user) => {
-            dispatch({ type: 'SET_CURRENT_USER', payload: user });
-          }).catch((e) => {
-            console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
-          });
-        } else {
+      githubService.validateToken()
+        .then(async (valid) => {
+          if (valid) {
+            dispatch({
+              type: 'SET_AUTHENTICATED',
+              payload: { isAuthenticated: true, accessToken: tokenToUse },
+            });
+            try {
+              const user = await githubService.getCurrentUser();
+              dispatch({ type: 'SET_CURRENT_USER', payload: user });
+            } catch (e) {
+              console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
+            }
+          } else {
+            storageService.removeAccessToken();
+            dispatch({ type: 'SET_ERROR', payload: 'Saved token is expired or invalid. Please log in again.' });
+          }
+        })
+        .catch(() => {
           storageService.removeAccessToken();
-          dispatch({ type: 'SET_ERROR', payload: 'Saved token is expired or invalid. Please log in again.' });
-        }
-      }).catch(() => {
-        storageService.removeAccessToken();
-      });
+        })
+        .finally(() => {
+          dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
+        });
+    } else {
+      dispatch({ type: 'SET_AUTH_CHECKING', payload: false });
     }
   }, []);
 
@@ -517,6 +538,10 @@ function App() {
     });
     return map;
   }, [recommendations]);
+
+  if (state.isAuthChecking) {
+    return null;
+  }
 
   if (!state.isAuthenticated) {
     return (

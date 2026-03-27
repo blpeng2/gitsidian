@@ -101,6 +101,7 @@ export interface AppState {
   showSearchModal: boolean;
   isEditingReadme: boolean;
   isLoading: boolean;
+  isAuthChecking: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
   viewMode: 'notes' | 'graph' | 'diary';
@@ -116,6 +117,7 @@ export interface AppState {
 // Action types
 export type AppAction =
   | { type: 'SET_AUTHENTICATED'; payload: { isAuthenticated: boolean; accessToken: string | null } }
+  | { type: 'SET_AUTH_CHECKING'; payload: boolean }
   | { type: 'SET_REPOS'; payload: GitHubRepo[] }
   | { type: 'ADD_REPO'; payload: GitHubRepo }
   | { type: 'SET_README_CONTENT'; payload: { repoName: string; content: string } }
