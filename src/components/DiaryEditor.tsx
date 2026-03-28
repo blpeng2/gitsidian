@@ -47,29 +47,51 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
     day: 'numeric',
   });
 
-  // Save to GitHub
+  const ownerRef = useRef(owner);
+  const dateRef = useRef(date);
+  const onSaveRef = useRef(onSave);
+  const initialContentRef = useRef(initialContent);
+  
+  ownerRef.current = owner;
+  dateRef.current = date;
+  onSaveRef.current = onSave;
+  initialContentRef.current = initialContent;
+
   const saveToGitHub = useCallback(async () => {
     const currentContent = contentRef.current;
-    if (!currentContent.trim()) return;
+    const currentOwner = ownerRef.current;
+    const currentDate = dateRef.current;
+    const currentOnSave = onSaveRef.current;
+
+    console.log('[Diary] saveToGitHub called', { currentDate, contentLength: currentContent.length });
+
+    if (!currentContent.trim()) {
+      console.log('[Diary] Skipping save - empty content');
+      return;
+    }
     setSaveStatus('saving');
     try {
-      const newSha = await githubService.saveDiaryEntry(owner, date, currentContent, shaRef.current);
+      console.log('[Diary] Calling API...');
+      const newSha = await githubService.saveDiaryEntry(currentOwner, currentDate, currentContent, shaRef.current);
+      console.log('[Diary] API success, new SHA:', newSha);
       shaRef.current = newSha;
-      storageService.removeDiaryDraft(date);
+      storageService.removeDiaryDraft(currentDate);
       setSaveStatus('saved');
-      onSave(date, currentContent, newSha);
+      currentOnSave(currentDate, currentContent, newSha);
     } catch (error) {
+      console.error('[Diary] Save error:', error);
       if (error instanceof Error && 'status' in error && (error as { status: number }).status === 409) {
-        // SHA conflict — re-fetch and retry
-        const fresh = await githubService.getDiaryEntry(owner, date);
+        console.log('[Diary] Conflict detected, retrying...');
+        const fresh = await githubService.getDiaryEntry(currentOwner, currentDate);
         if (fresh) {
           shaRef.current = fresh.sha;
           try {
-            const newSha = await githubService.saveDiaryEntry(owner, date, currentContent, fresh.sha);
+            const newSha = await githubService.saveDiaryEntry(currentOwner, currentDate, currentContent, fresh.sha);
+            console.log('[Diary] Retry success, new SHA:', newSha);
             shaRef.current = newSha;
-            storageService.removeDiaryDraft(date);
+            storageService.removeDiaryDraft(currentDate);
             setSaveStatus('saved');
-            onSave(date, currentContent, newSha);
+            currentOnSave(currentDate, currentContent, newSha);
             return;
           } catch {
             // fall through to error
@@ -78,18 +100,21 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
       }
       setSaveStatus('error');
     }
-  }, [owner, date, onSave]);
+  }, []);
 
   // Debounced autosave
   const scheduleSave = useCallback(() => {
+    console.log('[Diary] scheduleSave called');
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
+      console.log('[Diary] Auto-save timer fired');
       void saveToGitHub();
     }, 3000);
   }, [saveToGitHub]);
 
   // Handle content change
   const handleChange = useCallback((newContent: string) => {
+    console.log('[Diary] handleChange called');
     setContent(newContent);
     storageService.setDiaryDraft(date, newContent);
     setSaveStatus('modified');
@@ -108,15 +133,57 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [saveToGitHub]);
-
-  // Save on unmount
+  
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
-        // Content will be in draft already via handleChange
+        saveTimerRef.current = null;
+      }
+
+      const finalContent = contentRef.current;
+      const currentOwner = ownerRef.current;
+      const currentDate = dateRef.current;
+      const currentInitial = initialContentRef.current;
+      const currentOnSave = onSaveRef.current;
+
+      if (finalContent.trim() && finalContent !== currentInitial) {
+        console.log('[Diary] Saving on unmount:', currentDate);
+        void githubService.saveDiaryEntry(currentOwner, currentDate, finalContent, shaRef.current)
+          .then((newSha) => {
+            console.log('[Diary] Unmount save successful:', currentDate);
+            storageService.removeDiaryDraft(currentDate);
+            currentOnSave(currentDate, finalContent, newSha);
+          })
+          .catch(async (error) => {
+            if (error instanceof Error && 'status' in error && (error as { status: number }).status === 409) {
+              console.log('[Diary] Unmount save conflict, retrying with fresh SHA...');
+              const fresh = await githubService.getDiaryEntry(currentOwner, currentDate);
+              if (fresh) {
+                try {
+                  const newSha = await githubService.saveDiaryEntry(currentOwner, currentDate, finalContent, fresh.sha);
+                  console.log('[Diary] Unmount save retry successful:', currentDate);
+                  storageService.removeDiaryDraft(currentDate);
+                  currentOnSave(currentDate, finalContent, newSha);
+                  return;
+                } catch (retryErr) {
+                  console.error('[Diary] Unmount save retry failed:', retryErr);
+                }
+              }
+            }
+            console.error('[Diary] Unmount save failed:', error);
+          });
       }
     };
+  }, []);
+
+  useEffect(() => {
+    if (saveStatus === 'modified') {
+      const timer = setTimeout(() => {
+        void saveToGitHub();
+      }, 3000);
+      saveTimerRef.current = timer;
+    }
   }, []);
 
   // Wiki-link autocomplete
@@ -225,6 +292,13 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
     });
   };
 
+  const handleAskAI = useCallback(() => {
+    const handler = (window.webkit?.messageHandlers as Record<string, { postMessage: (body: unknown) => void } | undefined> | undefined)?.diaryAIPrompt;
+    if (handler) {
+      handler.postMessage(content);
+    }
+  }, [content]);
+
   const statusLabel = saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'modified' ? '● Modified' : saveStatus === 'saving' ? '⟳ Saving…' : '✕ Error';
 
   return (
@@ -261,6 +335,8 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
             <button onClick={() => insertAtCursor('> ')} title="Quote">"</button>
             <button onClick={() => insertAtCursor('`', '`')} title="Code">&lt;/&gt;</button>
             <button onClick={() => insertAtCursor('[[')} title="Wiki Link">[[</button>
+            <div className="diary-toolbar-separator" />
+            <button className="diary-ai-btn" onClick={handleAskAI} title="AI에게 질문">✨ AI</button>
           </div>
           <div className="diary-textarea-wrapper">
             <textarea

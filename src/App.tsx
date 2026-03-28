@@ -436,10 +436,9 @@ function App() {
   const handleOpenDiary = useCallback(async () => {
     dispatch({ type: 'SET_VIEW_MODE', payload: 'diary' });
     if (!state.currentUser) return;
-    if (state.diaryRepo) return;
-    const existing = state.repos.find((r) => r.name === 'gitsidian-diary');
+    const existing = state.diaryRepo ?? state.repos.find((r) => r.name === 'gitsidian-diary') ?? null;
     if (existing) {
-      dispatch({ type: 'SET_DIARY_REPO', payload: existing });
+      if (!state.diaryRepo) dispatch({ type: 'SET_DIARY_REPO', payload: existing });
       await handleLoadDiaryEntries(existing.owner.login);
     }
   }, [state.repos, state.diaryRepo, state.currentUser, handleLoadDiaryEntries]);

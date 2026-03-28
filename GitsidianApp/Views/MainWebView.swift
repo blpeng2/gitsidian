@@ -18,6 +18,7 @@ struct MainWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(WeakScriptMessageHandler(delegate: context.coordinator), name: "toggleAIPanel")
+        config.userContentController.add(WeakScriptMessageHandler(delegate: context.coordinator), name: "diaryAIPrompt")
         config.userContentController.add(
             WeakScriptMessageHandler(delegate: context.coordinator),
             name: "ghCli"
@@ -256,6 +257,15 @@ struct MainWebView: NSViewRepresentable {
 
             if message.name == "toggleAIPanel" {
                 NotificationCenter.default.post(name: .toggleAIPanel, object: nil)
+            }
+
+            if message.name == "diaryAIPrompt",
+               let content = message.body as? String {
+                NotificationCenter.default.post(
+                    name: .diaryAIPrompt,
+                    object: nil,
+                    userInfo: ["content": content]
+                )
             }
 
             if message.name == "ghCli" {

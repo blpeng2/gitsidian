@@ -210,5 +210,6 @@ extension Notification.Name {
     static let reloadWebApp = Notification.Name("reloadWebApp")
     static let oauthCallback = Notification.Name("oauthCallback")
     static let toggleAIPanel = Notification.Name("toggleAIPanel")
+    static let diaryAIPrompt = Notification.Name("diaryAIPrompt")
     static let toggleDevMode = Notification.Name("toggleDevMode")
 }

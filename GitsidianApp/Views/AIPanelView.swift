@@ -19,17 +19,48 @@ final class AIPanelWebViewStore: ObservableObject {
             js = """
             (function() {
                 const el = document.querySelector('#prompt-textarea')
+                    || document.querySelector('textarea[placeholder*="Message"]')
                     || document.querySelector('textarea')
                     || document.querySelector('[contenteditable="true"]');
                 if (el) {
                     if (el.tagName === 'TEXTAREA') {
                         el.value = '\(escapedPrompt)';
                         el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+                        el.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
                     } else {
                         el.focus();
                         el.innerHTML = '<p>' + '\(escapedPrompt)'.replace(/\\n/g, '</p><p>') + '</p>';
                         el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
                     }
+                    
+                    function tryClickSend(attempt = 0) {
+                        const sendBtn = document.querySelector('button[data-testid="send-button"]')
+                            || document.querySelector('button[aria-label="Send prompt"]')
+                            || document.querySelector('button[aria-label="Send message"]')
+                            || document.querySelector('[data-testid="send-button"]')
+                            || document.querySelector('button[aria-label*="send" i]')
+                            || document.querySelector('form button[type="submit"]')
+                            || document.querySelector('button:has(svg)')
+                        console.log('Attempt', attempt, 'Found button:', sendBtn, 'Disabled:', sendBtn?.disabled);
+                        if (sendBtn) {
+                            const rect = sendBtn.getBoundingClientRect();
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window,
+                                clientX: rect.left + rect.width/2,
+                                clientY: rect.top + rect.height/2
+                            });
+                            sendBtn.dispatchEvent(clickEvent);
+                            console.log('Click event dispatched');
+                        } else if (attempt < 10) {
+                            setTimeout(() => tryClickSend(attempt + 1), 200);
+                        }
+                    }
+                    setTimeout(() => tryClickSend(), 300);
                 }
             })();
             """
@@ -37,17 +68,56 @@ final class AIPanelWebViewStore: ObservableObject {
             js = """
             (function() {
                 const el = document.querySelector('[contenteditable="true"]')
-                    || document.querySelector('.ProseMirror');
+                    || document.querySelector('.ProseMirror')
+                    || document.querySelector('div[contenteditable]');
                 if (el) {
                     el.focus();
                     el.innerHTML = '<p>' + '\(escapedPrompt)'.replace(/\\n/g, '</p><p>') + '</p>';
                     el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    
+                    // Trigger keydown/keyup to activate submit button
+                    const keyEvent = new KeyboardEvent('keydown', {
+                        key: 'a',
+                        bubbles: true,
+                        keyCode: 65
+                    });
+                    el.dispatchEvent(keyEvent);
+                    el.dispatchEvent(new KeyboardEvent('keyup', {
+                        key: 'a',
+                        bubbles: true,
+                        keyCode: 65
+                    }));
+                    
+                    function tryClickSend(attempt = 0) {
+                        const formSubmitBtn = el.closest('form')?.querySelector('button[type="submit"]');
+                        const sendBtn = document.querySelector('button[aria-label="Send message"]')
+                            || document.querySelector('button[type="submit"]')
+                            || formSubmitBtn
+                            || document.querySelector('button:has(svg)')
+                        console.log('Claude attempt', attempt, 'Found button:', sendBtn, 'Disabled:', sendBtn?.disabled);
+                        if (sendBtn) {
+                            const rect = sendBtn.getBoundingClientRect();
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window,
+                                clientX: rect.left + rect.width/2,
+                                clientY: rect.top + rect.height/2
+                            });
+                            sendBtn.dispatchEvent(clickEvent);
+                            console.log('Claude click event dispatched');
+                        } else if (attempt < 10) {
+                            setTimeout(() => tryClickSend(attempt + 1), 200);
+                        }
+                    }
+                    setTimeout(() => tryClickSend(), 300);
                 }
             })();
             """
         }
 
-        webView.evaluateJavaScript(js) { _, error in
+        webView.evaluateJavaScript(js) { result, error in
             if let error { print("JS injection error: \(error)") }
         }
     }
@@ -64,6 +134,17 @@ struct AIPanelView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+
+        let consoleScript = WKUserScript(source: """
+            window.console.log = function(...args) {
+                window.webkit.messageHandlers.consoleLog.postMessage(args.join(' '));
+            };
+            window.console.error = function(...args) {
+                window.webkit.messageHandlers.consoleLog.postMessage('ERROR: ' + args.join(' '));
+            };
+        """, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        config.userContentController.addUserScript(consoleScript)
+        config.userContentController.add(context.coordinator, name: "consoleLog")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
@@ -95,7 +176,7 @@ struct AIPanelView: NSViewRepresentable {
         Coordinator(provider: provider)
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var currentProvider: AIProvider
         private var urlObservation: NSKeyValueObservation?
 
@@ -105,6 +186,12 @@ struct AIPanelView: NSViewRepresentable {
 
         deinit {
             urlObservation?.invalidate()
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "consoleLog" {
+                print("[WebView] \(message.body)")
+            }
         }
 
         func startObservingURL(_ webView: WKWebView) {

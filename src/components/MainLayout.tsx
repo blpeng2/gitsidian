@@ -160,6 +160,11 @@ function MainLayout({
     [selectedReadme]
   );
 
+  const visibleRepos = useMemo(
+    () => repos.filter((r) => r.name !== 'gitsidian-diary'),
+    [repos]
+  );
+
   const diaryMarkedDates = useMemo(
     () => new Set(Object.keys(diaryEntries)),
     [diaryEntries]
@@ -227,10 +232,10 @@ function MainLayout({
             <>
               <div className="explorer-header">
                 <h3>Notes</h3>
-                <span className="explorer-count">{repos.length}</span>
+                <span className="explorer-count">{visibleRepos.length}</span>
               </div>
               <RepoList
-                repos={repos}
+                repos={visibleRepos}
                 readmeContents={readmeContents}
                 selectedRepo={selectedRepo?.name || null}
                 onSelectRepo={onSelectRepo}
@@ -269,7 +274,7 @@ function MainLayout({
           {viewMode === 'diary' ? (
             <DiaryView
               owner={currentUser?.login ?? ''}
-              repos={repos}
+              repos={visibleRepos}
               diaryRepo={diaryRepo}
               diaryEntries={diaryEntries}
               diaryContents={diaryContents}
@@ -419,7 +424,7 @@ function MainLayout({
 
       {showSearchModal && (
         <SearchModal
-          repos={repos}
+          repos={visibleRepos}
           readmeContents={readmeContents}
           onSelectRepo={(repoName) => {
             onSelectRepo(repoName);

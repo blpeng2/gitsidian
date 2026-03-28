@@ -14,6 +14,10 @@ struct ContentView: View {
         selectedProvider == AIProvider.chatgpt.rawValue ? chatgptStore : claudeStore
     }
 
+    private var currentProvider: AIProvider {
+        AIProvider(rawValue: selectedProvider) ?? .chatgpt
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             MainWebView()
@@ -53,6 +57,33 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .toggleAIPanel)) { _ in
             if !aiPanelEverOpened { aiPanelEverOpened = true }
             showAIPanel.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .diaryAIPrompt)) { notification in
+            let diaryContent = notification.userInfo?["content"] as? String ?? ""
+            let prompt = """
+            다음은 내가 오늘 쓴 일기야:
+
+            ---
+            \(diaryContent)
+            ---
+
+            이 일기를 읽고, 내 이야기가 너무 재미있어서 더 듣고 싶어하는 친한 친구의 입장에서 질문해줘.
+
+            규칙:
+            - 각 문단을 읽고, 그 상황에서 자연스럽게 궁금해질 만한 것만 골라서 물어봐.
+            - 이미 일기에 충분히 설명된 내용(언제, 어디서 등)은 다시 묻지 마.
+            - "그래서 어떤 기분이었어?", "그 사람이 뭐라고 했어?", "왜 그렇게 한 거야?" 같은, 이야기를 더 끌어내는 질문을 해줘.
+            - 문단당 질문은 1~2개만. 전부 다 물으려 하지 마.
+            - 형식적이지 않게, 진짜 궁금한 톤으로 해줘.
+            - 한국어로 해줘.
+            """
+            if !showAIPanel {
+                if !aiPanelEverOpened { aiPanelEverOpened = true }
+                showAIPanel = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [self] in
+                self.currentStore.injectPrompt(prompt, provider: self.currentProvider)
+            }
         }
     }
 }
