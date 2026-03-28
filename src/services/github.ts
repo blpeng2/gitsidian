@@ -265,6 +265,18 @@ class GitHubService {
     });
   }
 
+  async updateVisibility(owner: string, repo: string, isPrivate: boolean): Promise<void> {
+    if (!this.octokit) {
+      throw new Error('Not authenticated');
+    }
+
+    await this.octokit.repos.update({
+      owner,
+      repo,
+      private: isPrivate,
+    });
+  }
+
   // Validate access token
   async validateToken(): Promise<boolean> {
     if (!this.octokit) {

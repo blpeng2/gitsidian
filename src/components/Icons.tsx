@@ -40,6 +40,17 @@ export const IconDiary = (props: IconProps) => (
   </BaseIcon>
 );
 
+export const IconTimeline = (props: IconProps) => (
+  <BaseIcon {...props}>
+    <path d="M3 4h10" />
+    <path d="M3 8h10" />
+    <path d="M3 12h10" />
+    <circle cx="5" cy="4" r="1" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="8" r="1" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="12" r="1" fill="currentColor" stroke="none" />
+  </BaseIcon>
+);
+
 export const IconNote = (props: IconProps) => (
   <BaseIcon {...props}>
     <path d="M3 2v12h10V5.5L9.5 2H3z" />

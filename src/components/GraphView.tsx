@@ -294,12 +294,8 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
     const cy = cyRef.current;
     if (!cy) return;
 
-    cy.json({
-      elements: {
-        nodes: data.nodes,
-        edges: data.edges,
-      },
-    });
+    cy.elements().remove();
+    cy.add(data);
 
     runCoseLayout(cy);
   }, [data, runCoseLayout]);
@@ -538,10 +534,6 @@ function GraphView({ data, filterOptions, selectedRepo, onSelectNode }: GraphVie
         <div className="legend-item">
           <span className="legend-dot private"></span>
           <span>Private</span>
-        </div>
-        <div className="legend-item">
-<span className="legend-dot has-readme"></span>
-          <span>Has README</span>
         </div>
         <div className="legend-item">
           <span className="legend-line wikilink"></span>

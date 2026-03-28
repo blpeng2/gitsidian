@@ -104,7 +104,7 @@ export interface AppState {
   isAuthChecking: boolean;
   isLoadingReadmes: boolean;
   error: string | null;
-  viewMode: 'notes' | 'graph' | 'diary';
+  viewMode: 'notes' | 'graph' | 'diary' | 'timeline';
   categoryFilter: NoteCategory | 'all';
   currentUser: GitHubUser | null;
   diaryRepo: GitHubRepo | null;
@@ -133,7 +133,7 @@ export type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_LOADING_READMES'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'SET_VIEW_MODE'; payload: 'notes' | 'graph' | 'diary' }
+  | { type: 'SET_VIEW_MODE'; payload: 'notes' | 'graph' | 'diary' | 'timeline' }
   | { type: 'SET_CATEGORY_FILTER'; payload: NoteCategory | 'all' }
   | { type: 'SET_CURRENT_USER'; payload: GitHubUser | null }
   | { type: 'SET_DIARY_REPO'; payload: GitHubRepo | null }
@@ -141,4 +141,5 @@ export type AppAction =
   | { type: 'SET_DIARY_CONTENT'; payload: { date: string; content: string; sha: string | null } }
   | { type: 'SET_SELECTED_DIARY_DATE'; payload: string | null }
   | { type: 'SET_LOADING_DIARY'; payload: boolean }
-  | { type: 'SET_REPO_CATEGORY'; payload: { repoName: string; category: NoteCategory } };
+  | { type: 'SET_REPO_CATEGORY'; payload: { repoName: string; category: NoteCategory } }
+  | { type: 'UPDATE_REPO_VISIBILITY'; payload: { repoName: string; isPrivate: boolean } };

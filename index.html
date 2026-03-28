@@ -9,6 +9,31 @@
           document.documentElement.setAttribute('data-theme', theme);
         }
       })();
+
+      function copyCodeBlock(btn) {
+        var code = btn.getAttribute('data-code');
+        if (!code) return;
+        navigator.clipboard.writeText(code).then(function() {
+          btn.textContent = '\u2713';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = 'Copy';
+            btn.classList.remove('copied');
+          }, 2000);
+        }).catch(function() {
+          btn.textContent = '\u2717';
+          setTimeout(function() {
+            btn.textContent = 'Copy';
+          }, 2000);
+        });
+      }
+
+      document.addEventListener('click', function(e) {
+        var btn = e.target.closest('.code-copy-btn');
+        if (btn) {
+          copyCodeBlock(btn);
+        }
+      });
     </script>
     <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

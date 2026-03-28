@@ -1,9 +1,11 @@
 import { GitHubRepo } from '../types';
 import { stripPrefix } from './strings';
+import { getLinkedReposFromContent } from './wikiLinks';
 
-export type SearchMatchType = 'name' | 'description' | 'topic' | 'content';
+export type SearchMatchType = 'name' | 'description' | 'topic' | 'content' | 'diary';
 
-export interface SearchResult {
+export interface RepoSearchResult {
+  kind: 'repo';
   repoName: string;
   displayName: string;      // repo.name with gitsidian- prefix stripped
   description: string;
@@ -11,6 +13,19 @@ export interface SearchResult {
   excerpt: string;          // context around the match
   score: number;
 }
+
+export interface DiarySearchResult {
+  kind: 'diary';
+  date: string;
+  displayName: string;
+  description: string;
+  matchType: SearchMatchType;
+  excerpt: string;
+  score: number;
+  relatedRepos: string[];
+}
+
+export type SearchResult = RepoSearchResult | DiarySearchResult;
 
 function getExcerpt(text: string, query: string): string {
   const lower = text.toLowerCase();
@@ -26,11 +41,11 @@ export function searchRepos(
   query: string,
   repos: GitHubRepo[],
   readmeContents: Record<string, string>
-): SearchResult[] {
+): RepoSearchResult[] {
   const q = query.trim();
   if (!q) return [];
   const lower = q.toLowerCase();
-  const results: SearchResult[] = [];
+  const results: RepoSearchResult[] = [];
 
   for (const repo of repos) {
     const displayName = stripPrefix(repo.name);
@@ -62,8 +77,46 @@ export function searchRepos(
       excerpt = getExcerpt(readme, q);
     }
 
-    results.push({ repoName: repo.name, displayName, description: repo.description ?? '', matchType, excerpt, score: best });
+    results.push({ kind: 'repo', repoName: repo.name, displayName, description: repo.description ?? '', matchType, excerpt, score: best });
   }
+
+  return results.sort((a, b) => b.score - a.score).slice(0, 50);
+}
+
+export function searchDiary(
+  query: string,
+  diaryContents: Record<string, string>,
+  repoNames: Set<string>
+): DiarySearchResult[] {
+  const q = query.trim();
+  if (!q) return [];
+
+  const lower = q.toLowerCase();
+  const results: DiarySearchResult[] = [];
+
+  Object.entries(diaryContents).forEach(([date, content]) => {
+    if (!content.toLowerCase().includes(lower) && !date.toLowerCase().includes(lower)) {
+      return;
+    }
+
+    const dateScore = date.toLowerCase().includes(lower) ? 55 : -1;
+    const contentScore = content.toLowerCase().includes(lower) ? 35 : -1;
+    const best = Math.max(dateScore, contentScore);
+    if (best < 0) {
+      return;
+    }
+
+    results.push({
+      kind: 'diary',
+      date,
+      displayName: date,
+      description: 'Diary entry',
+      matchType: 'diary',
+      excerpt: getExcerpt(content, q),
+      score: best,
+      relatedRepos: getLinkedReposFromContent(content, repoNames),
+    });
+  });
 
   return results.sort((a, b) => b.score - a.score).slice(0, 50);
 }

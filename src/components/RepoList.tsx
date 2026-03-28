@@ -1,16 +1,15 @@
 import { useState, useMemo } from 'react';
 import { GitHubRepo, NoteCategory } from '../types';
 import { getCategoryLabel, getRepoCategory } from '../utils/categoryRules';
-import { IconLock, IconGlobe, IconNote, IconLightbulb, IconChevronRight, IconChevronDown, IconInbox, IconActive, IconReference, IconArchive } from './Icons';
+import { stripPrefix } from '../utils/strings';
+import { IconNote, IconChevronRight, IconChevronDown, IconInbox, IconActive, IconReference, IconArchive } from './Icons';
 
 interface RepoListProps {
   repos: GitHubRepo[];
-  readmeContents: Record<string, string>;
   selectedRepo: string | null;
   onSelectRepo: (repoName: string | null) => void;
   categoryFilter: NoteCategory | 'all';
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
-  recommendations: Record<string, string>;
   onMoveCategory: (repoName: string, category: NoteCategory) => void;
   searchQuery: string;
 }
@@ -28,12 +27,10 @@ const CategoryIcon = ({ category, className = '' }: { category: NoteCategory | '
 
 function RepoList({
   repos,
-  readmeContents,
   selectedRepo,
   onSelectRepo,
   categoryFilter,
   onCategoryFilterChange,
-  recommendations,
   onMoveCategory,
   searchQuery,
   }: RepoListProps) {
@@ -115,7 +112,6 @@ function RepoList({
   };
 
   const renderRepoItem = (repo: GitHubRepo) => {
-    const hasReadme = !!readmeContents[repo.name];
     const isSelected = selectedRepo === repo.name;
 
     return (
@@ -126,16 +122,10 @@ function RepoList({
       >
         <div className="repo-item-header">
           <span className={`repo-visibility ${repo.private ? 'private' : 'public'}`}>
-            {repo.private ? <IconLock /> : <IconGlobe />}
+            {repo.private ? 'Private' : 'Public'}
           </span>
           <span className="repo-category-badge"><CategoryIcon category={getRepoCategory(repo)} /></span>
-          <span className="repo-name">{repo.name}</span>
-          {hasReadme && <span className="has-readme" title="Has README loaded"><IconNote /></span>}
-          {recommendations[repo.name] && (
-            <div className="recommendation-badge" title={recommendations[repo.name]}>
-              <IconLightbulb />
-            </div>
-          )}
+          <span className="repo-name">{stripPrefix(repo.name)}</span>
           <div className="category-move-actions">
             {(['inbox', 'active', 'reference', 'archive'] as NoteCategory[])
               .filter((category) => category !== getRepoCategory(repo))

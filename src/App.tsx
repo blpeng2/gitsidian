@@ -3,8 +3,8 @@ import { AppAction, AppState, DiaryEntry, NoteCategory } from './types';
 import { githubService } from './services/github';
 import { ghCliService } from './services/ghCli';
 import { storageService } from './services/storage';
-import { getBacklinks, generateGraphData } from './utils/wikiLinks';
-import { getCategoryIcon, getCategoryLabel, getRecommendations, setCategoryTopics } from './utils/categoryRules';
+import { generateGraphData } from './utils/wikiLinks';
+import { setCategoryTopics } from './utils/categoryRules';
 import LoginScreen from './components/LoginScreen';
 import MainLayout from './components/MainLayout';
 import './App.css';
@@ -91,6 +91,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedRepo: action.payload,
+        viewMode: 'notes',
+        isEditingReadme: false,
         openTabs: state.openTabs.includes(action.payload)
           ? state.openTabs
           : [...state.openTabs, action.payload],
@@ -170,6 +172,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
           repo.name === repoName
             ? { ...repo, topics: setCategoryTopics(repo.topics, category) }
             : repo
+        ),
+      };
+    }
+    case 'UPDATE_REPO_VISIBILITY': {
+      const { repoName, isPrivate } = action.payload;
+      return {
+        ...state,
+        repos: state.repos.map((repo) =>
+          repo.name === repoName ? { ...repo, private: isPrivate } : repo
         ),
       };
     }
@@ -401,6 +412,21 @@ function App() {
     }
   }, [state.repos]);
 
+  const handleUpdateVisibility = useCallback(async (repoName: string, isPrivate: boolean) => {
+    try {
+      const repo = state.repos.find((r) => r.name === repoName);
+      if (!repo) return;
+
+      await githubService.updateVisibility(repo.owner.login, repo.name, isPrivate);
+      dispatch({ type: 'UPDATE_REPO_VISIBILITY', payload: { repoName, isPrivate } });
+    } catch (error) {
+      dispatch({
+        type: 'SET_ERROR',
+        payload: error instanceof Error ? error.message : 'Failed to update visibility',
+      });
+    }
+  }, [state.repos]);
+
   const handleMoveCategory = useCallback(async (repoName: string, category: NoteCategory) => {
     try {
       const repo = state.repos.find((r) => r.name === repoName);
@@ -419,6 +445,33 @@ function App() {
     }
   }, [state.repos]);
 
+  const prefetchDiaryContents = useCallback(async (owner: string, entries: Record<string, DiaryEntry>) => {
+    const missingDates = Object.keys(entries).filter((date) => state.diaryContents[date] === undefined);
+    if (missingDates.length === 0) {
+      return;
+    }
+
+    const batchSize = 5;
+    for (let i = 0; i < missingDates.length; i += batchSize) {
+      const batch = missingDates.slice(i, i + batchSize);
+      const results = await Promise.all(batch.map(async (date) => ({
+        date,
+        entry: await githubService.getDiaryEntry(owner, date),
+      })));
+
+      results.forEach(({ date, entry }) => {
+        dispatch({
+          type: 'SET_DIARY_CONTENT',
+          payload: {
+            date,
+            content: entry?.content ?? '',
+            sha: entry?.sha ?? entries[date]?.sha ?? null,
+          },
+        });
+      });
+    }
+  }, [state.diaryContents]);
+
   const handleLoadDiaryEntries = useCallback(async (owner: string) => {
     dispatch({ type: 'SET_LOADING_DIARY', payload: true });
     try {
@@ -426,12 +479,46 @@ function App() {
       const entriesMap: Record<string, DiaryEntry> = {};
       entries.forEach((e) => { entriesMap[e.date] = e; });
       dispatch({ type: 'SET_DIARY_ENTRIES', payload: entriesMap });
+      void prefetchDiaryContents(owner, entriesMap);
     } catch (error) {
       dispatch({ type: 'SET_ERROR', payload: error instanceof Error ? error.message : 'Failed to load diary' });
     } finally {
       dispatch({ type: 'SET_LOADING_DIARY', payload: false });
     }
-  }, []);
+  }, [prefetchDiaryContents]);
+
+  useEffect(() => {
+    if (state.viewMode !== 'diary' || state.diaryRepo !== null || !state.currentUser) {
+      return;
+    }
+
+    const existingDiaryRepo = state.repos.find((repo) => repo.name === 'gitsidian-diary') ?? null;
+    if (!existingDiaryRepo) {
+      return;
+    }
+
+    dispatch({ type: 'SET_DIARY_REPO', payload: existingDiaryRepo });
+    void handleLoadDiaryEntries(existingDiaryRepo.owner.login);
+  }, [state.viewMode, state.diaryRepo, state.currentUser, state.repos, handleLoadDiaryEntries]);
+
+  useEffect(() => {
+    if (!state.currentUser) {
+      return;
+    }
+
+    const existingDiaryRepo = state.repos.find((repo) => repo.name === 'gitsidian-diary') ?? null;
+    if (!existingDiaryRepo) {
+      return;
+    }
+
+    if (!state.diaryRepo) {
+      dispatch({ type: 'SET_DIARY_REPO', payload: existingDiaryRepo });
+    }
+
+    if (Object.keys(state.diaryEntries).length === 0) {
+      void handleLoadDiaryEntries(existingDiaryRepo.owner.login);
+    }
+  }, [state.currentUser, state.repos, state.diaryRepo, state.diaryEntries, handleLoadDiaryEntries]);
 
   const handleOpenDiary = useCallback(async () => {
     dispatch({ type: 'SET_VIEW_MODE', payload: 'diary' });
@@ -439,6 +526,18 @@ function App() {
     const existing = state.diaryRepo ?? state.repos.find((r) => r.name === 'gitsidian-diary') ?? null;
     if (existing) {
       if (!state.diaryRepo) dispatch({ type: 'SET_DIARY_REPO', payload: existing });
+      await handleLoadDiaryEntries(existing.owner.login);
+    }
+  }, [state.repos, state.diaryRepo, state.currentUser, handleLoadDiaryEntries]);
+
+  const handleOpenTimeline = useCallback(async () => {
+    dispatch({ type: 'SET_VIEW_MODE', payload: 'timeline' });
+    if (!state.currentUser) return;
+    const existing = state.diaryRepo ?? state.repos.find((r) => r.name === 'gitsidian-diary') ?? null;
+    if (existing) {
+      if (!state.diaryRepo) {
+        dispatch({ type: 'SET_DIARY_REPO', payload: existing });
+      }
       await handleLoadDiaryEntries(existing.owner.login);
     }
   }, [state.repos, state.diaryRepo, state.currentUser, handleLoadDiaryEntries]);
@@ -503,7 +602,7 @@ function App() {
     dispatch({ type: 'SET_EDITING_README', payload: editing });
   }, []);
 
-  const handleSetViewMode = useCallback((mode: 'notes' | 'graph' | 'diary') => {
+  const handleSetViewMode = useCallback((mode: 'notes' | 'graph' | 'diary' | 'timeline') => {
     dispatch({ type: 'SET_VIEW_MODE', payload: mode });
   }, []);
 
@@ -516,27 +615,6 @@ function App() {
     () => state.repos.find((repo) => repo.name === state.selectedRepo) ?? null,
     [state.repos, state.selectedRepo]
   );
-
-  const backlinkCounts = useMemo<Record<string, number>>(() => {
-    const counts: Record<string, number> = {};
-    state.repos.forEach((repo) => {
-      counts[repo.name] = getBacklinks(repo.name, state.readmeContents).length;
-    });
-    return counts;
-  }, [state.repos, state.readmeContents]);
-
-  const recommendations = useMemo(
-    () => getRecommendations(state.repos, state.readmeContents, backlinkCounts),
-    [state.repos, state.readmeContents, backlinkCounts]
-  );
-
-  const recommendationMap = useMemo<Record<string, string>>(() => {
-    const map: Record<string, string> = {};
-    recommendations.forEach((rec) => {
-      map[rec.repoName] = `${getCategoryIcon(rec.suggestedCategory)} → ${getCategoryLabel(rec.suggestedCategory)}: ${rec.reason}`;
-    });
-    return map;
-  }, [recommendations]);
 
   if (state.isAuthChecking) {
     return null;
@@ -554,6 +632,12 @@ function App() {
             const token = await ghCliService.getToken();
             githubService.setAccessToken(token);
             dispatch({ type: 'SET_AUTHENTICATED', payload: { isAuthenticated: true, accessToken: token } });
+            try {
+              const user = await githubService.getCurrentUser();
+              dispatch({ type: 'SET_CURRENT_USER', payload: user });
+            } catch (e) {
+              console.warn('Failed to fetch user info:', e instanceof Error ? e.message : e);
+            }
           } catch (err) {
             dispatch({ type: 'SET_ERROR', payload: err instanceof Error ? err.message : '로그인에 실패했습니다.' });
           } finally {
@@ -580,7 +664,6 @@ function App() {
       isEditingReadme={state.isEditingReadme}
       openTabs={state.openTabs}
       categoryFilter={state.categoryFilter}
-      recommendations={recommendationMap}
       onSelectRepo={handleSelectRepo}
       onCloseTab={handleCloseTab}
       onCategoryFilterChange={handleCategoryFilterChange}
@@ -588,6 +671,7 @@ function App() {
       onCreateRepo={handleCreateRepo}
       onReadmeSaved={handleReadmeSaved}
       onUpdateTopics={handleUpdateTopics}
+      onUpdateVisibility={handleUpdateVisibility}
       onShowCreateModal={handleShowCreateModal}
       onEditReadme={handleEditReadme}
       onCloseEditor={handleCloseEditor}
@@ -601,6 +685,7 @@ function App() {
       selectedDiaryDate={state.selectedDiaryDate}
       isLoadingDiary={state.isLoadingDiary}
       onOpenDiary={handleOpenDiary}
+      onOpenTimeline={handleOpenTimeline}
       onEnsureDiaryRepo={handleEnsureDiaryRepo}
       onSelectDiaryDate={handleSelectDiaryDate}
       onLoadDiaryEntry={handleLoadDiaryEntry}

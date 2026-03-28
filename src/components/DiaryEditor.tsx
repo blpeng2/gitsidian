@@ -4,6 +4,7 @@ import { githubService } from '../services/github';
 import { storageService } from '../services/storage';
 import { renderMarkdown } from '../utils/markdown';
 import { stripPrefix } from '../utils/strings';
+import { findRepoName } from '../utils/wikiLinks';
 
 interface DiaryEditorProps {
   date: string;
@@ -14,9 +15,11 @@ interface DiaryEditorProps {
   entrySha: string | null;
   onSave: (date: string, content: string, newSha: string) => void;
   onClose: () => void;
+  onNavigateRepo?: (repoName: string) => void;
+  onNavigateDate?: (date: string) => void;
 }
 
-function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entrySha, onSave, onClose }: DiaryEditorProps) {
+function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entrySha, onSave, onClose, onNavigateRepo, onNavigateDate }: DiaryEditorProps) {
   const [content, setContent] = useState(() => {
     const draft = storageService.getDiaryDraft(date);
     return draft !== null && draft !== initialContent ? draft : initialContent;
@@ -56,6 +59,15 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
   dateRef.current = date;
   onSaveRef.current = onSave;
   initialContentRef.current = initialContent;
+
+  useEffect(() => {
+    const draft = storageService.getDiaryDraft(date);
+    const nextContent = draft !== null && draft !== initialContent ? draft : initialContent;
+    setContent(nextContent);
+    contentRef.current = nextContent;
+    shaRef.current = entrySha;
+    setSaveStatus(draft !== null && draft !== initialContent ? 'modified' : 'saved');
+  }, [date, initialContent, entrySha]);
 
   const saveToGitHub = useCallback(async () => {
     const currentContent = contentRef.current;
@@ -121,19 +133,6 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
     scheduleSave();
   }, [date, scheduleSave]);
 
-  // Ctrl+S immediate save
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        void saveToGitHub();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [saveToGitHub]);
-  
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -188,6 +187,16 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
 
   // Wiki-link autocomplete
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      void saveToGitHub();
+      return;
+    }
+
     if (showWikiPicker) {
       const filtered = getFilteredWikiItems();
       if (e.key === 'ArrowDown') {
@@ -299,6 +308,31 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
     }
   }, [content]);
 
+  const handlePreviewClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (!target.classList.contains('wikilink')) {
+      return;
+    }
+
+    const rawTarget = target.getAttribute('data-repo')?.trim();
+    if (!rawTarget) {
+      return;
+    }
+
+    if (rawTarget.startsWith('diary/')) {
+      const linkedDate = rawTarget.slice('diary/'.length);
+      if (linkedDate) {
+        onNavigateDate?.(linkedDate);
+      }
+      return;
+    }
+
+    const resolvedRepo = findRepoName(new Set(repoNames), rawTarget);
+    if (resolvedRepo) {
+      onNavigateRepo?.(resolvedRepo);
+    }
+  }, [onNavigateDate, onNavigateRepo, repoNames]);
+
   const statusLabel = saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'modified' ? '● Modified' : saveStatus === 'saving' ? '⟳ Saving…' : '✕ Error';
 
   return (
@@ -372,6 +406,7 @@ function DiaryEditor({ date, owner, repoNames, diaryDates, initialContent, entry
           {content ? (
             <div
               className="note-content"
+              onClick={handlePreviewClick}
               dangerouslySetInnerHTML={{ __html: renderedPreview }}
             />
           ) : (

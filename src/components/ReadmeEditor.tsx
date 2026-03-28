@@ -4,7 +4,7 @@ import { renderMarkdown } from '../utils/markdown';
 import { stripPrefix } from '../utils/strings';
 import { githubService } from '../services/github';
 import { storageService } from '../services/storage';
-import { IconBold, IconItalic, IconStrikethrough, IconH1, IconH2, IconH3, IconBulletList, IconNumberedList, IconCheckbox, IconLink, IconWikiLink, IconCode, IconCodeBlock, IconImage, IconQuote, IconHRule, IconEdit, IconClose } from './Icons';
+import { IconBold, IconItalic, IconStrikethrough, IconH1, IconH2, IconH3, IconBulletList, IconNumberedList, IconCheckbox, IconLink, IconWikiLink, IconCode, IconCodeBlock, IconImage, IconQuote, IconHRule, IconEdit, IconClose, IconLock, IconGlobe } from './Icons';
 
 interface SlashCommand {
   id: string;
@@ -84,9 +84,11 @@ interface ReadmeEditorProps {
   repoOwner: string;
   initialContent: string;
   currentTopics: string[];
+  isPrivate: boolean;
   onUpdateTopics: (topics: string[]) => void;
   onSave: (content: string) => void;
   onClose: () => void;
+  onToggleVisibility: () => void;
 }
 
 function ReadmeEditor({
@@ -95,9 +97,11 @@ function ReadmeEditor({
   repoOwner,
   initialContent,
   currentTopics,
+  isPrivate,
   onUpdateTopics,
   onSave,
   onClose,
+  onToggleVisibility,
 }: ReadmeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -113,6 +117,9 @@ function ReadmeEditor({
   const [slashSearch, setSlashSearch] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const [showInlineWikiPicker, setShowInlineWikiPicker] = useState(false);
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
+  const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
+  const [pendingVisibility, setPendingVisibility] = useState(false);
   const [inlineWikiSearch, setInlineWikiSearch] = useState('');
   const [inlineWikiSelectedIndex, setInlineWikiSelectedIndex] = useState(0);
   const [overlayPos, setOverlayPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -505,6 +512,18 @@ function ReadmeEditor({
         <div className="editor-title">
           <span className="editor-icon"><IconEdit /></span>
           <h2>{stripPrefix(repoName)}</h2>
+          <button
+            className="editor-visibility-toggle"
+            onClick={() => {
+              setPendingVisibility(!isPrivate);
+              setShowVisibilityConfirm(true);
+            }}
+            title={isPrivate ? 'Switch to Public' : 'Switch to Private'}
+            disabled={isUpdatingVisibility}
+          >
+            {isPrivate ? <IconLock /> : <IconGlobe />}
+            <span>{isPrivate ? 'Private' : 'Public'}</span>
+          </button>
         </div>
         <div className="editor-header-actions">
           <button
@@ -545,6 +564,37 @@ function ReadmeEditor({
           </button>
         </div>
       </div>
+
+      {showVisibilityConfirm && (
+        <div className="modal-overlay">
+          <div className="visibility-confirm-dialog">
+            <p>Are you sure you want to make this note {pendingVisibility ? 'private' : 'public'}?</p>
+            <p className="dialog-warning">{pendingVisibility ? 'Private' : 'Public'} notes can be viewed by anyone.</p>
+            <div className="dialog-buttons">
+              <button
+                className="dialog-btn-cancel"
+                onClick={() => setShowVisibilityConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="dialog-btn-confirm"
+                onClick={async () => {
+                  setShowVisibilityConfirm(false);
+                  setIsUpdatingVisibility(true);
+                  try {
+                    await onToggleVisibility();
+                  } finally {
+                    setIsUpdatingVisibility(false);
+                  }
+                }}
+              >
+                {pendingVisibility ? 'Make Private' : 'Make Public'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!showPreview && (
         <div className="editor-toolbar">

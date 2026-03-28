@@ -13,7 +13,9 @@ import DiaryView from './DiaryView';
 import DiaryCalendar from './DiaryCalendar';
 import TitleBar from './TitleBar';
 import SearchModal from './SearchModal';
+import TimelineView from './TimelineView';
 import { IconLoading, IconPlus, IconEdit } from './Icons';
+import { getDiaryBacklinks } from '../utils/wikiLinks';
 interface MainLayoutProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
@@ -27,10 +29,9 @@ interface MainLayoutProps {
   showSearchModal: boolean;
   onShowSearchModal: (show: boolean) => void;
   isEditingReadme: boolean;
-  viewMode: 'notes' | 'graph' | 'diary';
+  viewMode: 'notes' | 'graph' | 'diary' | 'timeline';
   openTabs: string[];
   categoryFilter: NoteCategory | 'all';
-  recommendations: Record<string, string>;
   onSelectRepo: (repoName: string | null) => void;
   onCloseTab: (repoName: string) => void;
   onCategoryFilterChange: (cat: NoteCategory | 'all') => void;
@@ -38,10 +39,11 @@ interface MainLayoutProps {
   onCreateRepo: (name: string, description: string, isPrivate: boolean) => Promise<void>;
   onReadmeSaved: (repoName: string, content: string) => void;
   onUpdateTopics: (repoName: string, topics: string[]) => Promise<void>;
+  onUpdateVisibility: (repoName: string, isPrivate: boolean) => Promise<void>;
   onShowCreateModal: (show: boolean) => void;
   onEditReadme: (editing: boolean) => void;
   onCloseEditor: () => void;
-  onSetViewMode: (mode: 'notes' | 'graph' | 'diary') => void;
+  onSetViewMode: (mode: 'notes' | 'graph' | 'diary' | 'timeline') => void;
   onMoveCategory: (repoName: string, category: NoteCategory) => void;
   currentUser: GitHubUser | null;
   diaryRepo: GitHubRepo | null;
@@ -50,6 +52,7 @@ interface MainLayoutProps {
   selectedDiaryDate: string | null;
   isLoadingDiary: boolean;
   onOpenDiary: () => void;
+  onOpenTimeline: () => void;
   onEnsureDiaryRepo: () => Promise<void>;
   onSelectDiaryDate: (date: string) => void;
   onLoadDiaryEntry: (date: string) => void;
@@ -72,7 +75,6 @@ function MainLayout({
   viewMode,
   openTabs,
   categoryFilter,
-  recommendations,
   onSelectRepo,
   onCloseTab,
   onCategoryFilterChange,
@@ -80,6 +82,7 @@ function MainLayout({
   onCreateRepo,
   onReadmeSaved,
   onUpdateTopics,
+  onUpdateVisibility,
   onShowCreateModal,
   onEditReadme,
   onCloseEditor,
@@ -92,6 +95,7 @@ function MainLayout({
   selectedDiaryDate,
   isLoadingDiary,
   onOpenDiary,
+  onOpenTimeline,
   onEnsureDiaryRepo,
   onSelectDiaryDate,
   onLoadDiaryEntry,
@@ -165,6 +169,11 @@ function MainLayout({
     [repos]
   );
 
+  const diaryBacklinks = useMemo(
+    () => (selectedRepo ? getDiaryBacklinks(selectedRepo.name, diaryContents, new Set(repos.map((repo) => repo.name))) : []),
+    [selectedRepo, diaryContents, repos]
+  );
+
   const diaryMarkedDates = useMemo(
     () => new Set(Object.keys(diaryEntries)),
     [diaryEntries]
@@ -189,6 +198,17 @@ function MainLayout({
     if (!resolvedRepo) return;
     onSelectRepo(resolvedRepo.name);
   };
+
+  const handleOpenRepoFromDiary = useCallback((repoName: string) => {
+    onSetViewMode('notes');
+    onSelectRepo(repoName);
+  }, [onSelectRepo, onSetViewMode]);
+
+  const handleOpenDiaryDate = useCallback((date: string) => {
+    onSetViewMode('diary');
+    onSelectDiaryDate(date);
+    onLoadDiaryEntry(date);
+  }, [onLoadDiaryEntry, onSelectDiaryDate, onSetViewMode]);
 
   return (
     <div className="main-layout">
@@ -217,10 +237,10 @@ function MainLayout({
             overflow: 'hidden',
           }}
         >
-          {viewMode === 'diary' ? (
+          {viewMode === 'diary' || viewMode === 'timeline' ? (
             <>
               <div className="explorer-header">
-                <h3>📔 Diary</h3>
+                <h3>{viewMode === 'timeline' ? '🕒 Timeline' : '📔 Diary'}</h3>
               </div>
               <DiaryCalendar
                 selectedDate={selectedDiaryDate}
@@ -236,12 +256,10 @@ function MainLayout({
               </div>
               <RepoList
                 repos={visibleRepos}
-                readmeContents={readmeContents}
                 selectedRepo={selectedRepo?.name || null}
                 onSelectRepo={onSelectRepo}
                 categoryFilter={categoryFilter}
                 onCategoryFilterChange={onCategoryFilterChange}
-                recommendations={recommendations}
                 onMoveCategory={onMoveCategory}
                 searchQuery={searchQuery}
               />
@@ -269,6 +287,7 @@ function MainLayout({
             onCloseTab={onCloseTab}
             onSelectGraph={() => onSetViewMode('graph')}
             onSelectDiary={onOpenDiary}
+            onSelectTimeline={onOpenTimeline}
           />
 
           {viewMode === 'diary' ? (
@@ -283,6 +302,16 @@ function MainLayout({
               onEnsureDiaryRepo={onEnsureDiaryRepo}
               onSelectDate={onSelectDiaryDate}
               onSave={onDiarySaved}
+              onNavigateRepo={handleOpenRepoFromDiary}
+              onNavigateDate={handleOpenDiaryDate}
+            />
+          ) : viewMode === 'timeline' ? (
+            <TimelineView
+              repos={visibleRepos}
+              diaryEntries={diaryEntries}
+              diaryContents={diaryContents}
+              onSelectRepo={handleOpenRepoFromDiary}
+              onSelectDiaryDate={handleOpenDiaryDate}
             />
           ) : viewMode === 'graph' ? (
             <div className="graph-container">
@@ -301,9 +330,11 @@ function MainLayout({
                 repoNames={repos.map((repo) => repo.name)}
                 initialContent={selectedReadme}
                 currentTopics={selectedRepo.topics}
+                isPrivate={selectedRepo.private}
                 onUpdateTopics={(topics: string[]) => void onUpdateTopics(selectedRepo.name, topics)}
                 onSave={(content: string) => onReadmeSaved(selectedRepo.name, content)}
                 onClose={onCloseEditor}
+                onToggleVisibility={() => void onUpdateVisibility(selectedRepo.name, !selectedRepo.private)}
               />
             ) : (
               <div className="note-viewer">
@@ -392,6 +423,25 @@ function MainLayout({
               )}
             </div>
             <div className="links-panel">
+              <h4>Mentioned in diary</h4>
+              {diaryBacklinks.length > 0 ? (
+                <div className="links-list">
+                  {diaryBacklinks.map((backlink) => (
+                    <div
+                      key={`${backlink.date}-${backlink.alias || ''}`}
+                      className="link-item"
+                      onClick={() => handleOpenDiaryDate(backlink.date)}
+                    >
+                      <span>{backlink.date}</span>
+                      {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="no-links">No diary mentions</div>
+              )}
+            </div>
+            <div className="links-panel">
               <h4>Links to</h4>
               {outlinks.length > 0 ? (
                 <div className="links-list">
@@ -426,8 +476,14 @@ function MainLayout({
         <SearchModal
           repos={visibleRepos}
           readmeContents={readmeContents}
+          diaryContents={diaryContents}
           onSelectRepo={(repoName) => {
+            onSetViewMode('notes');
             onSelectRepo(repoName);
+            onShowSearchModal(false);
+          }}
+          onSelectDiary={(date) => {
+            handleOpenDiaryDate(date);
             onShowSearchModal(false);
           }}
           onClose={() => onShowSearchModal(false)}

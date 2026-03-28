@@ -14,6 +14,8 @@ interface DiaryViewProps {
   onEnsureDiaryRepo: () => Promise<void>;
   onSelectDate: (date: string) => void;
   onSave: (date: string, content: string, newSha: string) => void;
+  onNavigateRepo?: (repoName: string) => void;
+  onNavigateDate?: (date: string) => void;
 }
 
 function DiaryView({
@@ -27,6 +29,8 @@ function DiaryView({
   onEnsureDiaryRepo,
   onSelectDate,
   onSave,
+  onNavigateRepo,
+  onNavigateDate,
 }: DiaryViewProps) {
 
   const repoNames = useMemo(
@@ -62,7 +66,7 @@ function DiaryView({
           <div className="placeholder-content">
             <h2>📔 Diary</h2>
             <p>Start writing daily entries. A private repository will be created to store your diary.</p>
-            <button className="diary-create-btn" onClick={() => void onEnsureDiaryRepo()}>
+            <button type="button" className="diary-create-btn" onClick={() => void onEnsureDiaryRepo()}>
               Create Diary
             </button>
           </div>
@@ -74,22 +78,32 @@ function DiaryView({
   const currentEntry = selectedDate ? diaryEntries[selectedDate] : undefined;
   const currentContent = selectedDate ? (diaryContents[selectedDate] ?? '') : '';
   const currentSha = currentEntry?.sha ?? null;
+  const isEntryLoading = !!selectedDate && !!currentEntry && diaryContents[selectedDate] === undefined;
 
   return (
     <div className="diary-view">
       <div className="diary-content">
         {selectedDate ? (
-          <DiaryEditor
-            key={selectedDate}
-            date={selectedDate}
-            owner={owner}
-            repoNames={repoNames}
-            diaryDates={diaryDates}
-            initialContent={currentContent}
-            entrySha={currentSha}
-            onSave={onSave}
-            onClose={handleEditorClose}
-          />
+          isEntryLoading ? (
+            <div className="diary-loading">
+              <IconLoading style={{ marginRight: '8px' }} />
+              Loading entry…
+            </div>
+          ) : (
+            <DiaryEditor
+              key={selectedDate}
+              date={selectedDate}
+              owner={owner}
+              repoNames={repoNames}
+              diaryDates={diaryDates}
+              initialContent={currentContent}
+              entrySha={currentSha}
+              onSave={onSave}
+              onClose={handleEditorClose}
+              onNavigateRepo={onNavigateRepo}
+              onNavigateDate={onNavigateDate}
+            />
+          )
         ) : (
           <div className="diary-placeholder">
             <div className="placeholder-content">

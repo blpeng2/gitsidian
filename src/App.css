@@ -648,7 +648,20 @@ textarea {
 }
 
 .repo-visibility {
-  font-size: 0.9rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.repo-visibility.private {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.repo-visibility.public {
+  background: rgba(63, 185, 80, 0.15);
+  color: var(--accent-success);
 }
 
 .repo-name {
@@ -1059,6 +1072,61 @@ textarea {
   cursor: not-allowed;
 }
 
+.visibility-confirm-dialog {
+  background: var(--bg-secondary);
+  padding: 1.5rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: var(--shadow);
+}
+
+.visibility-confirm-dialog p {
+  margin: 0 0 0.75rem;
+  color: var(--text-primary);
+}
+
+.dialog-warning {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.dialog-btn-cancel {
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.dialog-btn-cancel:hover {
+  background: var(--bg-secondary);
+}
+
+.dialog-btn-confirm {
+  padding: 0.5rem 1rem;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.dialog-btn-confirm:hover {
+  opacity: 0.9;
+}
+
 
 .theme-selector {
   position: relative;
@@ -1152,6 +1220,26 @@ textarea {
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+}
+
+.editor-visibility-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.editor-visibility-toggle:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
 }
 
 .editor-unsaved {
@@ -1307,9 +1395,11 @@ textarea {
   overflow-y: auto;
   color: var(--text-primary);
   font-size: 0.95rem;
-  line-height: 1.8;
+  line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .editor-preview .wikilink {
@@ -1513,8 +1603,10 @@ textarea {
   overflow-y: auto;
   padding: 1.5rem 2rem;
   font-size: 0.95rem;
-  line-height: 1.8;
+  line-height: 1.5;
   color: var(--text-primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .note-content .wikilink {
@@ -1727,9 +1819,95 @@ textarea {
   overflow-x: auto;
   margin: 1em 0;
   border: 1px solid var(--border-color);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .note-content pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.9em;
+  line-height: 1.6;
+}
+
+.code-block-wrapper {
+  position: relative;
+  margin: 1em 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.75rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.code-block-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.code-block-lang {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.code-block-filename {
+  font-size: 0.75rem;
+  color: var(--accent-secondary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  margin-left: 0.5rem;
+}
+
+.code-copy-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.code-copy-btn:hover {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: white;
+}
+
+.code-copy-btn.copied {
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+  color: white;
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-content .code-block-wrapper pre,
+.editor-preview .code-block-wrapper pre {
+  background: var(--bg-tertiary);
+  padding: 1rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.note-content .code-block-wrapper pre code,
+.editor-preview .code-block-wrapper pre code {
   background: transparent;
   padding: 0;
   font-size: 0.9em;
@@ -1821,7 +1999,7 @@ textarea {
 .editor-preview p { margin: 0.75em 0; }
 .editor-preview a { color: var(--accent-secondary); text-decoration: none; }
 .editor-preview code { background: var(--bg-tertiary); padding: 0.15em 0.4em; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
-.editor-preview pre { background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1em 0; border: 1px solid var(--border-color); }
+.editor-preview pre { background: var(--bg-tertiary); padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1em 0; border: 1px solid var(--border-color); white-space: pre-wrap; word-break: break-word; }
 .editor-preview pre code { background: transparent; padding: 0; }
 .editor-preview blockquote { border-left: 3px solid var(--accent-primary); padding: 0.5rem 1rem; margin: 1em 0; color: var(--text-secondary); }
 .editor-preview ul, .editor-preview ol { padding-left: 1.5em; margin: 0.75em 0; }
@@ -2937,6 +3115,8 @@ textarea {
   overflow-y: auto;
   padding: 1rem;
   background: var(--bg-primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .diary-preview-empty {

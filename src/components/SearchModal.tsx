@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GitHubRepo } from '../types';
-import { searchRepos, SearchResult } from '../utils/search';
+import { searchDiary, searchRepos, SearchResult } from '../utils/search';
+import { stripPrefix } from '../utils/strings';
 
 interface SearchModalProps {
   repos: GitHubRepo[];
   readmeContents: Record<string, string>;
+  diaryContents: Record<string, string>;
   onSelectRepo: (repoName: string) => void;
+  onSelectDiary: (date: string) => void;
   onClose: () => void;
 }
 
@@ -14,6 +17,7 @@ const MATCH_LABELS: Record<string, string> = {
   description: 'Desc',
   topic: 'Topic',
   content: 'README',
+  diary: 'Diary',
 };
 
 function highlightText(text: string, query: string): React.ReactNode {
@@ -31,7 +35,7 @@ function highlightText(text: string, query: string): React.ReactNode {
   );
 }
 
-function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchModalProps) {
+function SearchModal({ repos, readmeContents, diaryContents, onSelectRepo, onSelectDiary, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -40,9 +44,11 @@ function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchMod
 
   // Run search whenever query changes
   useEffect(() => {
-    setResults(searchRepos(query, repos, readmeContents));
+    const repoResults = searchRepos(query, repos, readmeContents);
+    const diaryResults = searchDiary(query, diaryContents, new Set(repos.map((repo) => repo.name)));
+    setResults([...repoResults, ...diaryResults].sort((a, b) => b.score - a.score).slice(0, 50));
     setSelectedIndex(0);
-  }, [query, repos, readmeContents]);
+  }, [query, repos, readmeContents, diaryContents]);
 
   // Auto-focus input on open
   useEffect(() => {
@@ -59,10 +65,22 @@ function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchMod
       e.preventDefault();
       setSelectedIndex(i => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' && results[selectedIndex]) {
-      onSelectRepo(results[selectedIndex].repoName);
+      if (results[selectedIndex].kind === 'repo') {
+        onSelectRepo(results[selectedIndex].repoName);
+      } else {
+        onSelectDiary(results[selectedIndex].date);
+      }
       onClose();
     }
-  }, [results, selectedIndex, onSelectRepo, onClose]);
+  }, [results, selectedIndex, onSelectRepo, onSelectDiary, onClose]);
+
+  const handleResultSelect = useCallback((result: SearchResult) => {
+    if (result.kind === 'repo') {
+      onSelectRepo(result.repoName);
+      return;
+    }
+    onSelectDiary(result.date);
+  }, [onSelectDiary, onSelectRepo]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -95,9 +113,9 @@ function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchMod
             ) : (
               results.map((result, i) => (
                 <div
-                  key={result.repoName}
+                  key={result.kind === 'repo' ? result.repoName : result.date}
                   className={`search-result-item ${i === selectedIndex ? 'selected' : ''}`}
-                  onClick={() => { onSelectRepo(result.repoName); onClose(); }}
+                  onClick={() => { handleResultSelect(result); onClose(); }}
                   onMouseEnter={() => setSelectedIndex(i)}
                 >
                   <div className="search-result-name">
@@ -106,6 +124,11 @@ function SearchModal({ repos, readmeContents, onSelectRepo, onClose }: SearchMod
                       {MATCH_LABELS[result.matchType]}
                     </span>
                   </div>
+                  {result.kind === 'diary' && result.relatedRepos.length > 0 && (
+                    <div className="search-result-excerpt">
+                      Linked: {result.relatedRepos.map((repoName) => stripPrefix(repoName)).join(', ')}
+                    </div>
+                  )}
                   {result.matchType !== 'name' && (
                     <div className="search-result-excerpt">
                       {highlightText(result.excerpt, query)}

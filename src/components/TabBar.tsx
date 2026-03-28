@@ -1,18 +1,19 @@
 import React, { type MouseEvent } from 'react';
-import { IconGraph, IconDiary, IconClose } from './Icons';
+import { IconGraph, IconDiary, IconClose, IconTimeline } from './Icons';
 import { stripPrefix } from '../utils/strings';
 
 interface TabBarProps {
   tabs: string[];
   activeTab: string | null;
-  viewMode: 'notes' | 'graph' | 'diary';
+  viewMode: 'notes' | 'graph' | 'diary' | 'timeline';
   onSelectTab: (repoName: string) => void;
   onCloseTab: (repoName: string) => void;
   onSelectGraph: () => void;
   onSelectDiary: () => void;
+  onSelectTimeline: () => void;
 }
 
-function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGraph, onSelectDiary }: TabBarProps) {
+function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGraph, onSelectDiary, onSelectTimeline }: TabBarProps) {
   const handleClose = (event: MouseEvent, repoName: string) => {
     event.stopPropagation();
     onCloseTab(repoName);
@@ -33,6 +34,13 @@ function TabBar({ tabs, activeTab, viewMode, onSelectTab, onCloseTab, onSelectGr
       >
         <IconDiary className="tab-icon" style={{marginRight: '6px'}} />
         <span className="tab-name">Diary</span>
+      </div>
+      <div
+        className={`tab-item tab-timeline ${viewMode === 'timeline' ? 'active' : ''}`}
+        onClick={onSelectTimeline}
+      >
+        <IconTimeline className="tab-icon" style={{marginRight: '6px'}} />
+        <span className="tab-name">Timeline</span>
       </div>
       {tabs.map((tab) => (
         <div

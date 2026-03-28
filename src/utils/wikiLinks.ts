@@ -6,13 +6,13 @@ export const WIKILINK_PATTERN = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 /**
  * Parse wiki-links from text
  */
-function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
+export function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
   const links: WikiLink[] = [];
-  let match: RegExpExecArray | null;
   // Reset regex lastIndex
   const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
 
-  while ((match = regex.exec(text)) !== null) {
+  let match = regex.exec(text);
+  while (match !== null) {
     const targetRepo = match[1].trim();
     const alias = match[2]?.trim();
     if (targetRepo && targetRepo.toLowerCase() !== sourceRepo.toLowerCase()) {
@@ -22,6 +22,7 @@ function parseWikiLinks(text: string, sourceRepo: string): WikiLink[] {
         ...(alias && { alias }),
       });
     }
+    match = regex.exec(text);
   }
 
   return links;
@@ -37,7 +38,7 @@ function extractLinksFromReadme(readmeContent: string, sourceRepo: string): Wiki
 /**
  * Find repo name case-insensitively
  */
-function findRepoName(repoNames: Set<string>, target: string): string | null {
+export function findRepoName(repoNames: Set<string>, target: string): string | null {
   // Exact match first
   if (repoNames.has(target)) return target;
   // Case-insensitive match
@@ -53,6 +54,49 @@ function findRepoName(repoNames: Set<string>, target: string): string | null {
   }
 
   return null;
+}
+
+export function getLinkedReposFromContent(content: string, repoNames: Set<string>): string[] {
+  const seen = new Set<string>();
+  const links = parseWikiLinks(content, '__diary__');
+
+  links.forEach((link) => {
+    if (link.target.startsWith('diary/')) {
+      return;
+    }
+
+    const resolved = findRepoName(repoNames, link.target);
+    if (resolved) {
+      seen.add(resolved);
+    }
+  });
+
+  return Array.from(seen);
+}
+
+export function getDiaryBacklinks(
+  repoName: string,
+  diaryContents: Record<string, string>,
+  repoNames: Set<string>
+): { date: string; alias?: string }[] {
+  const backlinks: { date: string; alias?: string }[] = [];
+
+  Object.entries(diaryContents).forEach(([date, content]) => {
+    const links = parseWikiLinks(content, `diary/${date}`);
+    links.forEach((link) => {
+      if (link.target.startsWith('diary/')) {
+        return;
+      }
+
+      const resolved = findRepoName(repoNames, link.target);
+      if (resolved?.toLowerCase() === repoName.toLowerCase()) {
+        backlinks.push({ date, alias: link.alias });
+      }
+    });
+  });
+
+  backlinks.sort((a, b) => b.date.localeCompare(a.date));
+  return backlinks;
 }
 
 /**
@@ -109,9 +153,10 @@ export function generateGraphData(
     });
   });
 
-  // Create edges from shared topics
   const topicMap = new Map<string, string[]>();
+  const repoTopics = new Map<string, string[]>();
   repos.forEach((repo) => {
+    repoTopics.set(repo.name, repo.topics);
     repo.topics.forEach((topic) => {
       if (!topicMap.has(topic)) {
         topicMap.set(topic, []);
@@ -124,6 +169,10 @@ export function generateGraphData(
     if (repoNamesList.length > 1) {
       for (let i = 0; i < repoNamesList.length; i++) {
         for (let j = i + 1; j < repoNamesList.length; j++) {
+          const topicsI = repoTopics.get(repoNamesList[i]) || [];
+          const topicsJ = repoTopics.get(repoNamesList[j]) || [];
+          const bothInbox = topicsI.includes('inbox') && topicsJ.includes('inbox');
+          if (bothInbox) continue;
           const edgeKey = [repoNamesList[i], repoNamesList[j]].sort().join('-topic-');
 
           if (!edgeSet.has(edgeKey)) {
