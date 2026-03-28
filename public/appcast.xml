@@ -7,21 +7,21 @@
         <language>en</language>
         <item>
             <title>Gitsidian 1.9.0</title>
-            <pubDate>Sat, 28 Mar 2026 18:05:28 +0000</pubDate>
+            <pubDate>Sat, 28 Mar 2026 18:27:02 +0000</pubDate>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
                 url="https://github.com/blpeng2/gitsidian/releases/download/v1.9.0/Gitsidian-macOS-arm64.zip"
                 sparkle:version="1.9.0"
-                sparkle:edSignature="spaeRa723NzKhfSAJ2UakasnTbSDydNdr2URkIdmcxhXkY9BL3ZzsPYJAK2R9uuYjrvJQVTv4HhIAMAdXVljBw=="
-                length="2388176"
+                sparkle:edSignature="o5DdwBubohawC2rSxFr/LvrxhX6B1WsJfqETXGuUal8ggvzc5cF2OALCTv9lyhULXbRA3EM1lRk37/al+KaBCw=="
+                length="2389415"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="arm64" />
             <enclosure
                 url="https://github.com/blpeng2/gitsidian/releases/download/v1.9.0/Gitsidian-macOS-x86_64.zip"
                 sparkle:version="1.9.0"
-                sparkle:edSignature="EJw4vu6VmUaoG7Z5nTHHsN5rRhI5ujR8iJODGDdEAlAvDTloOx0JEe2vJ7WWhfILunzbq92ldYDNi2sqh0h6DQ=="
-                length="2390989"
+                sparkle:edSignature="HrwKXwiwxPCpbyf8xe+h1lZnYN4735B9Ggv5tMi3mCWCKNV7/48qIaUVB35vTN8DRyoN4q3AGbrvaK6EYJCZBw=="
+                length="2392321"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="x86_64" />
