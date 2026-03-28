@@ -173,11 +173,27 @@ function MainLayout({
     () => (selectedRepo ? getDiaryBacklinks(selectedRepo.name, diaryContents, new Set(repos.map((repo) => repo.name))) : []),
     [selectedRepo, diaryContents, repos]
   );
+  const repoDateByName = useMemo(
+    () => new Map(repos.map((repo) => [repo.name, repo.updated_at])),
+    [repos]
+  );
 
   const diaryMarkedDates = useMemo(
     () => new Set(Object.keys(diaryEntries)),
     [diaryEntries]
   );
+
+  const formatLinkDate = useCallback((isoDate?: string) => {
+    if (!isoDate) return null;
+    const parsedDate = new Date(isoDate);
+    if (Number.isNaN(parsedDate.getTime())) return null;
+
+    return parsedDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, []);
 
   const handleDiarySelectDate = useCallback((date: string) => {
     onSelectDiaryDate(date);
@@ -407,16 +423,24 @@ function MainLayout({
               <h4>Linked from</h4>
               {backlinks.length > 0 ? (
                 <div className="links-list">
-                  {backlinks.map((backlink) => (
-                    <div
-                      key={backlink.source}
-                      className="link-item"
-                      onClick={() => onSelectRepo(backlink.source)}
-                    >
-                      <span>{stripPrefix(backlink.source)}</span>
-                      {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
-                    </div>
-                  ))}
+                  {backlinks.map((backlink) => {
+                    const linkDate = formatLinkDate(repoDateByName.get(backlink.source));
+
+                    return (
+                      <div
+                        key={`${backlink.source}-${backlink.alias || ''}-${backlink.excerpt || ''}`}
+                        className="link-item"
+                        onClick={() => onSelectRepo(backlink.source)}
+                      >
+                        <div className="link-item-header">
+                          <span className="link-title">{stripPrefix(backlink.source)}</span>
+                          {linkDate && <span className="link-date">{linkDate}</span>}
+                        </div>
+                        {backlink.alias && <span className="link-alias">as {backlink.alias}</span>}
+                        {backlink.excerpt && <p className="link-excerpt">{backlink.excerpt}</p>}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="no-links">No backlinks</div>

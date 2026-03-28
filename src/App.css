@@ -811,26 +811,54 @@ textarea {
 
 .links-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
 .link-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
   background: var(--bg-tertiary);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
   font-size: 0.85rem;
-  color: var(--accent-secondary);
+  color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.link-item-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.link-title {
+  font-weight: 600;
+  color: var(--accent-secondary);
+}
+
+.link-date {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.link-excerpt {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
 }
 
 .link-item:hover {
-  background: var(--accent-primary);
-  color: white;
+  background: rgba(88, 166, 255, 0.08);
+  border-color: var(--accent-primary);
 }
 
 .no-links {
@@ -1240,6 +1268,31 @@ textarea {
   background: var(--bg-secondary);
   color: var(--text-primary);
   border-color: var(--accent-primary);
+}
+
+.editor-topic-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.editor-topic-toggle:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--accent-primary);
+}
+
+.topic-hash {
+  font-weight: 600;
+  color: var(--accent-primary);
 }
 
 .editor-unsaved {
@@ -1699,7 +1752,7 @@ textarea {
 }
 
 .link-alias {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-secondary);
   font-style: italic;
 }

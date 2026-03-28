@@ -88,7 +88,7 @@ interface ReadmeEditorProps {
   onUpdateTopics: (topics: string[]) => void;
   onSave: (content: string) => void;
   onClose: () => void;
-  onToggleVisibility: () => void;
+  onToggleVisibility: () => Promise<void> | void;
 }
 
 function ReadmeEditor({
@@ -111,8 +111,9 @@ function ReadmeEditor({
   const [wikiSearch, setWikiSearch] = useState('');
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [topicInput, setTopicInput] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [uploadOverlayState, setUploadOverlayState] = useState<null | 'uploading' | 'success'>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [pasteToast, setPasteToast] = useState<null | 'pasting' | 'success' | 'error'>(null);
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashSearch, setSlashSearch] = useState('');
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
@@ -141,6 +142,30 @@ function ReadmeEditor({
   const slashInsertPosRef = useRef(0);
   const wikiInsertPosRef = useRef(0);
   const editorBodyRef = useRef<HTMLDivElement>(null);
+  const pasteToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uploadOverlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearPasteToastTimer = useCallback(() => {
+    if (pasteToastTimerRef.current) {
+      clearTimeout(pasteToastTimerRef.current);
+      pasteToastTimerRef.current = null;
+    }
+  }, []);
+
+  const queuePasteToastClear = useCallback((delayMs: number) => {
+    clearPasteToastTimer();
+    pasteToastTimerRef.current = setTimeout(() => {
+      setPasteToast(null);
+      pasteToastTimerRef.current = null;
+    }, delayMs);
+  }, [clearPasteToastTimer]);
+
+  const clearUploadOverlayTimer = useCallback(() => {
+    if (uploadOverlayTimerRef.current) {
+      clearTimeout(uploadOverlayTimerRef.current);
+      uploadOverlayTimerRef.current = null;
+    }
+  }, []);
 
   const saveToGitHub = useCallback(async () => {
     const contentToSave = contentRef.current;
@@ -259,7 +284,9 @@ function ReadmeEditor({
       return;
     }
 
-    setIsUploading(true);
+    clearUploadOverlayTimer();
+    setUploadError(null);
+    setUploadOverlayState('uploading');
     try {
       const timestamp = Date.now();
       const originalName = file.name || 'image.png';
@@ -288,14 +315,21 @@ function ReadmeEditor({
 
       const imageUrl = await githubService.uploadImage(repoOwner, repoName, filename, base64);
       insertMarkdown(`![${originalName}](${imageUrl})`);
+      setPasteToast('success');
+      queuePasteToastClear(1500);
+      setUploadOverlayState('success');
+      uploadOverlayTimerRef.current = setTimeout(() => {
+        setUploadOverlayState(null);
+        uploadOverlayTimerRef.current = null;
+      }, 900);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Image upload failed';
       setUploadError(message);
-      setTimeout(() => setUploadError(null), 5000);
-    } finally {
-      setIsUploading(false);
+      setPasteToast('error');
+      queuePasteToastClear(5000);
+      setUploadOverlayState(null);
     }
-  }, [repoOwner, repoName, insertMarkdown]);
+  }, [repoOwner, repoName, insertMarkdown, clearUploadOverlayTimer, queuePasteToastClear]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (showInlineWikiPicker) {
@@ -401,18 +435,17 @@ function ReadmeEditor({
     const linkText = `[[${stripPrefix(targetRepo)}]]`;
 
     if (showInlineWikiPicker) {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        const cursor = textarea.selectionStart;
-        const insertStart = wikiInsertPosRef.current;
-        const newContent = content.substring(0, insertStart) + linkText + content.substring(cursor);
-        updateContent(newContent);
-        setTimeout(() => {
-          textarea.focus();
-          const newCursor = insertStart + linkText.length;
-          textarea.setSelectionRange(newCursor, newCursor);
-        }, 0);
-      }
+      const insertStart = wikiInsertPosRef.current;
+      const insertEnd = Math.max(insertStart, textareaRef.current?.selectionStart ?? insertStart);
+      const newContent = content.substring(0, insertStart) + linkText + content.substring(insertEnd);
+      updateContent(newContent);
+      setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        const newCursor = insertStart + linkText.length;
+        textarea.setSelectionRange(newCursor, newCursor);
+      }, 0);
       setShowInlineWikiPicker(false);
       setInlineWikiSearch('');
       setInlineWikiSelectedIndex(0);
@@ -503,8 +536,10 @@ function ReadmeEditor({
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
+      clearPasteToastTimer();
+      clearUploadOverlayTimer();
     };
-  }, [repoName, saveToGitHub]);
+  }, [repoName, saveToGitHub, clearPasteToastTimer, clearUploadOverlayTimer]);
 
   return (
     <div className="editor-fullscreen">
@@ -523,6 +558,14 @@ function ReadmeEditor({
           >
             {isPrivate ? <IconLock /> : <IconGlobe />}
             <span>{isPrivate ? 'Private' : 'Public'}</span>
+          </button>
+          <button
+            className="editor-topic-toggle"
+            onClick={() => setShowTopicPicker(!showTopicPicker)}
+            title="Add topic"
+          >
+            <span className="topic-hash">#</span>
+            <span>Topics</span>
           </button>
         </div>
         <div className="editor-header-actions">
@@ -583,7 +626,7 @@ function ReadmeEditor({
                   setShowVisibilityConfirm(false);
                   setIsUpdatingVisibility(true);
                   try {
-                    await onToggleVisibility();
+                    await Promise.resolve(onToggleVisibility());
                   } finally {
                     setIsUpdatingVisibility(false);
                   }
@@ -724,9 +767,32 @@ function ReadmeEditor({
       )}
 
       <div className="editor-body" ref={editorBodyRef}>
-        {isUploading && (
+        {uploadOverlayState && (
           <div className="upload-overlay">
-            <span>📤 Uploading image...</span>
+            <span>{uploadOverlayState === 'success' ? '✅ Image uploaded' : '📤 Uploading image...'}</span>
+          </div>
+        )}
+        {pasteToast && !showPreview && (
+          <div
+            className={`paste-toast paste-toast-${pasteToast}`}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              zIndex: 35,
+              padding: '6px 10px',
+              borderRadius: '6px',
+              fontSize: '0.82rem',
+              fontWeight: 500,
+              border: `1px solid ${pasteToast === 'error' ? 'var(--accent-danger)' : 'var(--border-color)'}`,
+              background: pasteToast === 'error' ? 'color-mix(in srgb, var(--accent-danger) 12%, var(--surface-primary) 88%)' : 'var(--surface-primary)',
+              color: pasteToast === 'error' ? 'var(--accent-danger)' : 'var(--text-primary)',
+              boxShadow: '0 4px 10px rgba(0, 0, 0, 0.18)',
+            }}
+          >
+            {pasteToast === 'pasting' && '📋 Image pasted, uploading...'}
+            {pasteToast === 'success' && '✅ Image uploaded'}
+            {pasteToast === 'error' && `⚠ ${uploadError ?? 'Image upload failed'}`}
           </div>
         )}
         {showInlineWikiPicker && !showPreview && (() => {
@@ -743,8 +809,7 @@ function ReadmeEditor({
                 <button
                   key={name}
                   className={`inline-autocomplete-item ${index === inlineWikiSelectedIndex ? 'selected' : ''}`}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
                     insertWikiLink(name);
                   }}
                   onMouseEnter={() => setInlineWikiSelectedIndex(index)}
@@ -860,6 +925,8 @@ function ReadmeEditor({
               for (let i = 0; i < items.length; i++) {
                 if (items[i].type.startsWith('image/')) {
                   e.preventDefault();
+                  setPasteToast('pasting');
+                  queuePasteToastClear(3000);
                   const file = items[i].getAsFile();
                   if (file) {
                     void handleImageUpload(file);

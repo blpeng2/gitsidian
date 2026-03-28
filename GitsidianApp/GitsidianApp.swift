@@ -18,7 +18,7 @@ struct GitsidianApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private weak var mainWindow: NSWindow?
+    private var mainWindow: NSWindow?
     private let updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
         updaterDelegate: nil,
@@ -41,6 +41,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // Clean up window animations before termination to prevent crashes
+        if let window = mainWindow {
+            window.animations = [:]
+            window.contentView = nil
+        }
+        mainWindow = nil
     }
 
     // MARK: - Menu

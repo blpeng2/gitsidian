@@ -211,15 +211,54 @@ export function generateGraphData(
 export function getBacklinks(
   repoName: string,
   readmeContents: Record<string, string>
-): { source: string; alias?: string }[] {
-  const backlinks: { source: string; alias?: string }[] = [];
+): { source: string; alias?: string; excerpt?: string }[] {
+  const backlinks: { source: string; alias?: string; excerpt?: string }[] = [];
+  const repoNames = new Set([...Object.keys(readmeContents), repoName]);
+  const CONTEXT_CHARS = 35;
+  const MAX_EXCERPT_CHARS = 80;
+
+  const formatExcerpt = (content: string, matchIndex: number, linkText: string): string => {
+    const start = Math.max(0, matchIndex - CONTEXT_CHARS);
+    const end = Math.min(content.length, matchIndex + linkText.length + CONTEXT_CHARS);
+
+    const beforeRaw = content.slice(start, matchIndex).replace(/\s+/g, ' ').trimStart();
+    const linkRaw = linkText.replace(/\s+/g, ' ');
+    const afterRaw = content.slice(matchIndex + linkText.length, end).replace(/\s+/g, ' ').trimEnd();
+
+    const available = Math.max(0, MAX_EXCERPT_CHARS - linkRaw.length);
+    const beforeBudget = Math.floor(available / 2);
+    const afterBudget = available - beforeBudget;
+
+    const before = beforeRaw.length > beforeBudget ? beforeRaw.slice(beforeRaw.length - beforeBudget) : beforeRaw;
+    const after = afterRaw.length > afterBudget ? afterRaw.slice(0, afterBudget) : afterRaw;
+
+    const hasPrefix = start > 0 || beforeRaw.length > beforeBudget;
+    const hasSuffix = end < content.length || afterRaw.length > afterBudget;
+
+    return `${hasPrefix ? '…' : ''}${before}${linkRaw}${after}${hasSuffix ? '…' : ''}`;
+  };
 
   Object.entries(readmeContents).forEach(([sourceRepo, content]) => {
     if (sourceRepo === repoName) return;
-    const links = parseWikiLinks(content, sourceRepo);
-    const matching = links.filter((l) => l.target.toLowerCase() === repoName.toLowerCase());
-    if (matching.length > 0) {
-      backlinks.push(...matching.map((link) => ({ source: sourceRepo, alias: link.alias })));
+
+    const regex = new RegExp(WIKILINK_PATTERN.source, WIKILINK_PATTERN.flags);
+    let match = regex.exec(content);
+
+    while (match !== null) {
+      const targetRepo = match[1].trim();
+      const resolved = findRepoName(repoNames, targetRepo);
+
+      if (resolved?.toLowerCase() === repoName.toLowerCase()) {
+        const alias = match[2]?.trim();
+        const linkText = match[0];
+        backlinks.push({
+          source: sourceRepo,
+          ...(alias && { alias }),
+          excerpt: formatExcerpt(content, match.index, linkText),
+        });
+      }
+
+      match = regex.exec(content);
     }
   });
 
