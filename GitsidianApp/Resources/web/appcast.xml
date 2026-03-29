@@ -2,26 +2,26 @@
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
     <channel>
         <title>Gitsidian</title>
-        <link>https://blpeng2.github.io/gitsidian/appcast.xml</link>
+        <link>https://raw.githubusercontent.com/blpeng2/gitsidian/main/public/appcast.xml</link>
         <description>Gitsidian Updates</description>
         <language>en</language>
         <item>
-            <title>Gitsidian 1.8.0</title>
-            <pubDate>Fri, 27 Mar 2026 15:24:06 +0000</pubDate>
+            <title>Gitsidian 1.9.0</title>
+            <pubDate>Sat, 28 Mar 2026 18:05:28 +0000</pubDate>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <enclosure
-                url="https://github.com/blpeng2/gitsidian/releases/download/v1.8.0/Gitsidian-macOS-arm64.zip"
-                sparkle:version="1.8.0"
-                sparkle:edSignature="P3iB8GT2oYVjXLn9hYbwExuHWrkfes5F9IUJNnYcYI5pNe/p668JK+flUL9FtiRy46lrGvba+ndk1AEPOt/HDQ=="
-                length="2381409"
+                url="https://github.com/blpeng2/gitsidian/releases/download/v1.9.0/Gitsidian-macOS-arm64.zip"
+                sparkle:version="1.9.0"
+                sparkle:edSignature="spaeRa723NzKhfSAJ2UakasnTbSDydNdr2URkIdmcxhXkY9BL3ZzsPYJAK2R9uuYjrvJQVTv4HhIAMAdXVljBw=="
+                length="2388176"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="arm64" />
             <enclosure
-                url="https://github.com/blpeng2/gitsidian/releases/download/v1.8.0/Gitsidian-macOS-x86_64.zip"
-                sparkle:version="1.8.0"
-                sparkle:edSignature="iDy1j5XJ63aeQqo4ELLNX3HUHtfCcd6p9dnRTmsBiXw1K5vZ++njwQkmZVJnxuPdUeNyTe58w8M9KoaEp06WAg=="
-                length="2384240"
+                url="https://github.com/blpeng2/gitsidian/releases/download/v1.9.0/Gitsidian-macOS-x86_64.zip"
+                sparkle:version="1.9.0"
+                sparkle:edSignature="EJw4vu6VmUaoG7Z5nTHHsN5rRhI5ujR8iJODGDdEAlAvDTloOx0JEe2vJ7WWhfILunzbq92ldYDNi2sqh0h6DQ=="
+                length="2390989"
                 type="application/zip"
                 sparkle:os="macos"
                 sparkle:arch="x86_64" />
